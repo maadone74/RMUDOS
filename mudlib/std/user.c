@@ -124,6 +124,21 @@ void say_cmd(string msg) {
     }
 }
 
+void emote_cmd(string msg) {
+    object env;
+    string myname;
+    if (!msg || msg == "") {
+        write("Emote what?");
+        return;
+    }
+    myname = query_name();
+    env = environment(this_object());
+    write("You " + msg);
+    if (env) {
+        tell_room(env, capitalize(myname) + " " + msg, this_object());
+    }
+}
+
 void who_cmd() {
     mixed u;
     int i;
@@ -231,7 +246,7 @@ void logon() {
     write("  MudOS-inspired LPC on Rust");
     write("========================================");
     write("");
-    write("Commands: look, go <dir>, say <text>, who, alias, quit, help");
+    write("Commands: look, go <dir>, say <text>, emote, who, alias, quit, help");
     write("");
     start = load_object("/room/void");
     move_object(start);
@@ -292,6 +307,11 @@ int process_input(string line) {
         write("> ");
         return 1;
     }
+    if (cmd == "emote" || cmd == "me") {
+        emote_cmd(arg);
+        write("> ");
+        return 1;
+    }
     if (cmd == "who") {
         who_cmd();
         write("> ");
@@ -311,6 +331,7 @@ int process_input(string line) {
         write("look / l              - describe room");
         write("go <dir> / north      - move");
         write("say <text>            - speak");
+        write("emote / me <text>     - perform an action");
         write("who                   - list players");
         write("alias [name] [cmd]    - list/set command alias");
         write("unalias <name>        - remove an alias");
