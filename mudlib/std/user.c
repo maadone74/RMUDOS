@@ -1,9 +1,11 @@
 // /std/user.c — interactive player object
 
 string name;
+mapping aliases;
 
 void create() {
     name = "Guest";
+    aliases = ([]);
 }
 
 void set_name(string n) {
@@ -134,6 +136,93 @@ void who_cmd() {
     }
 }
 
+void list_aliases() {
+    mixed ks;
+    int i;
+    string k;
+
+    if (!aliases) {
+        aliases = ([]);
+    }
+    ks = keys(aliases);
+    if (sizeof(ks) == 0) {
+        write("No aliases set. Use: alias <name> <command>");
+        return;
+    }
+    write("Aliases:");
+    i = 0;
+    while (i < sizeof(ks)) {
+        k = ks[i];
+        write("  " + k + " -> " + aliases[k]);
+        i = i + 1;
+    }
+}
+
+void alias_cmd(string arg) {
+    string aname;
+    string expansion;
+
+    if (!aliases) {
+        aliases = ([]);
+    }
+    if (!arg || arg == "") {
+        list_aliases();
+        return;
+    }
+    aname = extract_cmd(arg);
+    expansion = extract_arg(arg);
+    if (!aname || aname == "") {
+        write("Alias what?");
+        return;
+    }
+    if (!expansion || expansion == "") {
+        if (aliases[aname]) {
+            write(aname + " -> " + aliases[aname]);
+        } else {
+            write("No alias for '" + aname + "'.");
+        }
+        return;
+    }
+    if (aname == "alias" || aname == "unalias" || aname == "quit" || aname == "logout") {
+        write("You cannot alias that command.");
+        return;
+    }
+    aliases[aname] = expansion;
+    write("Alias set: " + aname + " -> " + expansion);
+}
+
+void unalias_cmd(string aname) {
+    mapping next;
+    mixed ks;
+    int i;
+    string k;
+
+    if (!aliases) {
+        aliases = ([]);
+    }
+    if (!aname || aname == "") {
+        write("Unalias what?");
+        return;
+    }
+    aname = lower_case(aname);
+    if (!aliases[aname]) {
+        write("No alias for '" + aname + "'.");
+        return;
+    }
+    next = ([]);
+    ks = keys(aliases);
+    i = 0;
+    while (i < sizeof(ks)) {
+        k = ks[i];
+        if (k != aname) {
+            next[k] = aliases[k];
+        }
+        i = i + 1;
+    }
+    aliases = next;
+    write("Alias '" + aname + "' removed.");
+}
+
 void logon() {
     object start;
     write("");
@@ -142,7 +231,7 @@ void logon() {
     write("  MudOS-inspired LPC on Rust");
     write("========================================");
     write("");
-    write("Commands: look, go <dir>, say <text>, who, quit, help");
+    write("Commands: look, go <dir>, say <text>, who, alias, quit, help");
     write("");
     start = load_object("/room/void");
     move_object(start);
@@ -153,6 +242,7 @@ void logon() {
 int process_input(string line) {
     string cmd;
     string arg;
+    string expanded;
 
     if (!line || line == "") {
         write("> ");
@@ -161,6 +251,22 @@ int process_input(string line) {
 
     cmd = extract_cmd(line);
     arg = extract_arg(line);
+
+    if (cmd != "alias" && cmd != "unalias") {
+        if (!aliases) {
+            aliases = ([]);
+        }
+        if (aliases[cmd]) {
+            expanded = aliases[cmd];
+            if (arg && arg != "") {
+                line = expanded + " " + arg;
+            } else {
+                line = expanded;
+            }
+            cmd = extract_cmd(line);
+            arg = extract_arg(line);
+        }
+    }
 
     if (cmd == "quit" || cmd == "logout") {
         write("Goodbye!");
@@ -191,12 +297,24 @@ int process_input(string line) {
         write("> ");
         return 1;
     }
+    if (cmd == "alias") {
+        alias_cmd(arg);
+        write("> ");
+        return 1;
+    }
+    if (cmd == "unalias") {
+        unalias_cmd(arg);
+        write("> ");
+        return 1;
+    }
     if (cmd == "help") {
-        write("look / l          - describe room");
-        write("go <dir> / north  - move");
-        write("say <text>        - speak");
-        write("who               - list players");
-        write("quit              - disconnect");
+        write("look / l              - describe room");
+        write("go <dir> / north      - move");
+        write("say <text>            - speak");
+        write("who                   - list players");
+        write("alias [name] [cmd]    - list/set command alias");
+        write("unalias <name>        - remove an alias");
+        write("quit                  - disconnect");
         write("> ");
         return 1;
     }
