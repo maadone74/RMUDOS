@@ -1,0 +1,6 @@
+mud_name = "RustMud"
+bind = "0.0.0.0"
+port = 4000
+mudlib = "mudlib"
+master = "/secure/master"
+max_cost = 1000000

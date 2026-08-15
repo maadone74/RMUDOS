@@ -1,0 +1,22 @@
+[package]
+name = "rmudos"
+version = "0.1.0"
+edition = "2021"
+description = "Concise Rust LPC/MudOS-inspired MUD driver"
+license = "MIT"
+authors = ["rmudos"]
+readme = "README.md"
+keywords = ["mud", "lpc", "mudos", "driver"]
+categories = ["games", "compilers"]
+
+[dependencies]
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "signal"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indexmap = "=2.6.0"
+parking_lot = "0.12"
+
+[profile.release]
+lto = true
+codegen-units = 1
