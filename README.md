@@ -66,4 +66,4 @@ The checked-in tests currently require a live driver process; they are not self-
 
 ## Origin
 
-Imported from `maadone74/maadOS-rust` `rust-src/` as created by earlier Cursor cloud agent work (PRs 1–5 on that repository). Runtime log files were not copied.
+Imported from `maadone74/maadOS-rust` `rust-src/` as created by earlier Cursor cloud agent work (PRs 1–5 on that repository). Runtime log files were not copied. The crate edition was set to 2021 so it builds on current stable Rust (the original `rust-src` listed edition 2024).
