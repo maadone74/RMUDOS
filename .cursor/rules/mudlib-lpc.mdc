@@ -1,0 +1,25 @@
+---
+description: Sample mudlib LPC subset and driver boot contract
+globs: mudlib/**/*.c
+alwaysApply: false
+---
+
+# Mudlib LPC
+
+Write to the **rmudos subset** in `docs/LPC.md` and efuns in `docs/EFUNS.md`. This is not a full FluffOS lib.
+
+## Boot contract
+
+- `/secure/master` must define `create`, `preload`, and `connect`.
+- `preload` loads rooms (or other world objects) via `load_object`.
+- `connect` returns a cloned user object (`clone_object("/std/user")`).
+- User objects should define `logon` and `process_input(string line)` (return `0` to quit).
+- Rooms typically `inherit "/std/room"` and set extras in `create`.
+
+## Language limits
+
+No `#include`, no simul_efun, no `save_object` yet, no `catch`. Use `//` and `/* */` comments. Declare locals at the start of the function. Paths are `/foo/bar` without `.c`.
+
+If you need a new language feature or efun for the mudlib, implement it in the driver first, then use it here. Do not assume MudOS-only efuns exist.
+
+Keep commands in `/std/user` small and consistent with `docs/MUDLIB.md`.

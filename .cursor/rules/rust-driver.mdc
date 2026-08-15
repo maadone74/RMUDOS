@@ -1,0 +1,19 @@
+---
+description: Rust coding conventions for the rmudos driver
+globs: src/**/*.rs
+alwaysApply: false
+---
+
+# Rust driver code
+
+- Public crate surface stays small: `DriverConfig`, `MudWorld`, and the module tree in `src/lib.rs`.
+- Use `anyhow::{Result, bail, Context}` for recoverable driver/LPC errors. Include the object path or efun name in the message.
+- `MudWorld` owns objects, blueprints, master, efuns, and shutdown. Do not stash a second world map.
+- `ObjectRef` is `Arc<Mutex<Object>>` (parking_lot). Drop a guard before applying into another object when possible. `move_object` already avoids locking the moving object while mutating the old environment.
+- `LpcValue` must remain cloneable and dynamically typed. Do not switch the VM to static LPC types.
+- Tokio belongs in `backend` and `net`. Compiler, VM, efuns, and simulate stay sync so tests can call them without a runtime (except existing tokio channels in connect tests).
+- Prefer extending `Op` / `Interpreter` over interpreting LPC by walking the AST at runtime.
+- Heartbeats: only objects whose program defines `heart_beat`; interval 2s.
+- `max_cost` from config aborts an apply; keep costing in the interpreter, not ad hoc in efuns unless the efun itself loops.
+- Names: `snake_case` functions, MudOS efun names as LPC strings (`call_other`, `this_player`).
+- After behavior changes, extend tests in `src/lib.rs` or a `#[cfg(test)]` module next to the code.

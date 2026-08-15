@@ -1,0 +1,45 @@
+---
+description: VM, object, and apply semantics aligned with MudOS
+globs: src/vm/**/*.rs
+alwaysApply: false
+---
+
+# VM and objects
+
+MudOS analogues: `interpret.c`, `object.c`, `program.c`, `lpc.h` (`svalue_t`), `simulate.c`, `applies`.
+
+## Values (`LpcValue` ↔ `svalue_t`)
+
+| rmudos | MudOS |
+| --- | --- |
+| `Null` / int `0` | `T_NUMBER` 0, undefined |
+| `Int(i64)` | `T_NUMBER` |
+| `Float(f64)` | `T_REAL` |
+| `String` | `T_STRING` |
+| `Array` | `T_ARRAY` |
+| `Mapping` (string keys today) | `T_MAPPING` (mixed keys in C) |
+| `Object(ObjectRef)` | `T_OBJECT` |
+
+Falsy: null, 0, 0.0, empty string/array/mapping, destructed object.
+
+Not implemented: buffers, classes, function pointers, lvalues as first-class stack types.
+
+## Objects
+
+- Blueprint: `load_object` compiles once, stores path → id in `blueprints`, runs `create()`.
+- Clone: `clone_object` compiles, assigns `clone_number`, runs `create()`, file name `path#clone`.
+- Inventory: `environment` weak, `inventory` strong. `move_object` updates both, then applies `init` on dest and mover.
+- Destruct: flag, detach interactive, unlink inventory/env, drop blueprint if this id owned it.
+
+## Applies
+
+Driver calls named functions. Missing function → `Ok(Null)` (optional hook). See `src/vm/apply.rs` and MudOS `applies`.
+
+Boot: load master → `create` (via load) → `preload`. Connect: master `connect()` → attach interactive → `logon()`. Input: `process_input(line)`; return `0` means disconnect.
+
+## Interpreter
+
+- Stack bytecode in `Op`. Cost against `config.max_cost`.
+- `this_player` / `previous_object` are interpreter fields, not globals.
+- `call_other` / `obj->fn` must set previous object correctly.
+- Do not re-enter `apply` while holding the target object's mutex.

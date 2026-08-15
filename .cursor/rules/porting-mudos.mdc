@@ -1,0 +1,28 @@
+---
+description: Use when porting a MudOS C feature, comparing with lnsoso/mudos, or expanding driver compatibility
+alwaysApply: false
+---
+
+# Porting from MudOS v22.2b14
+
+Upstream reference: https://github.com/lnsoso/mudos (Linux, MySQL package). Clone to `/tmp/mudos` or a sibling dir when you need the C text; do not copy C into this repo.
+
+## Do port (semantic)
+
+Efuns mudlibs actually call, applies in `applies`, compiler productions used by real LPC, `call_out`, eval cost, `catch`/`throw`, save/restore, `valid_read`/`valid_write`, simul_efun, then sockets/db.
+
+## Do not port (mechanism)
+
+`bsdmalloc`/`smalloc`, `swap.c`, `ccode.c` / LPC-to-C, `edit_source.c`, Amiga/Win32, `addr_server` as a required sidecar, opcode profiling, `debugmalloc`.
+
+## Method
+
+1. Find the C symbol (`func_spec.c`, `applies`, `grammar.y.pre`, or `.c` file).
+2. Note `#ifdef` / `options.h` flags (this fork enables `PACKAGE_DB` + MySQL, `PACKAGE_SOCKETS`, `PACKAGE_UIDS`, `PACKAGE_CONTRIB`, `NO_LIGHT`, `CALLOUT_HANDLES`, heartbeat 2s).
+3. Implement the Rust equivalent in the mapped module (see `AGENTS.md`).
+4. Tests for the semantic edge cases (0 vs undefined, missing object, destructed refs, inherit override).
+5. Docs.
+
+lnsoso-specific extras live under `packages/db.c` and `packages/qqwry.c`. Treat MySQL as a later optional crate feature, not a boot requirement.
+
+Use skill `port-mudos-layer` and subagent `mudos-archivist` for C reading; `compat-reviewer` after the Rust change.

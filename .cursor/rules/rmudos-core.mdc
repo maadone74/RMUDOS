@@ -1,0 +1,38 @@
+---
+description: Core rmudos identity, MudOS mapping, and porting philosophy
+alwaysApply: true
+---
+
+# rmudos core
+
+This repository is a Rust LPC driver (crate `rmudos`) inspired by MudOS v22.2b14 / FluffOS. Original C reference: https://github.com/lnsoso/mudos
+
+It is a **clean-room redesign** of the same layers, not a C-to-Rust transliteration.
+
+## Architecture (keep this split)
+
+- `src/backend.rs` — boot, accept, heartbeats (Tokio)
+- `src/net/` — telnet line I/O
+- `src/simulate.rs` — master boot, `connect()`, `logon()`, destruct
+- `src/vm/` — `MudWorld`, objects, `LpcValue`, bytecode interpreter, applies
+- `src/compiler/` — lex, parse, inherit, codegen
+- `src/efun/` — built-in functions registered in `EfunTable`
+- `mudlib/` — sample LPC world; `/secure/master` is the boot object
+
+## Non-negotiables
+
+- Observable LPC semantics track MudOS when a feature is implemented (names, truthiness, inherit override, path mapping, apply names).
+- Implementation uses Rust ownership, `Arc<Mutex<Object>>`, and explicit `Interpreter` context. Do not introduce MudOS-style process-global interpreter pointers.
+- Do not port: custom allocators, swap, LPC-to-C, platform ports, `debugmalloc`.
+- Optional applies that are missing on an object return null; they must not crash the driver.
+- Stay inside the mudlib root for object/inherit paths (`..` must not escape).
+- Document user-visible language/efun changes in `docs/`.
+
+## When the user asks to “port MudOS”
+
+1. Identify the C file / efun / apply / grammar production.
+2. Map it onto the Rust module in the table in `AGENTS.md`.
+3. Implement the smallest semantic slice the sample mudlib or tests need.
+4. Add tests; update docs.
+
+Read `.cursor/skills/port-mudos-layer/SKILL.md` for the full workflow.

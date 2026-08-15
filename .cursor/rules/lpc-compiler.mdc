@@ -1,0 +1,36 @@
+---
+description: LPC compiler porting rules for lexer, parser, and bytecode codegen
+globs: src/compiler/**/*.rs
+alwaysApply: false
+---
+
+# LPC compiler
+
+Pipeline: read `mudlib/<path>.c` → lex → parse `ProgramAst` → recursively compile inherits → `codegen::generate` → `Program`.
+
+Canonical entry: `compile_file_in(mudlib_root, "/object/path")`.
+
+## Compatibility with MudOS compiler
+
+Reference C: `lex.c`, `grammar.y.pre`, `compiler.c`, `generate.c`, `icode.c`, `trees.c`.
+
+Implemented enough for the sample mudlib:
+
+- `inherit`, globals, functions, `if`/`else`, `while`, `return`, ternary
+- Arithmetic/compare/logic, assignment, index, slice, `({ })`, `([ ])`
+- `obj->fn()` desugars to `call_other`
+- `this_object()` is a compiler intrinsic (`Op::ThisObject`), not an efun
+
+Not yet: preprocessor (`#include` / `#define`), `foreach`, closures / function pointers, `catch`, classes/structs, `switch` completeness, `for` C-style, simul_efun rewriting.
+
+## Rules
+
+- Types on declarations are parsed as keywords but runtime values stay `LpcValue`.
+- Later inherit/local functions override earlier names in the merged function table; `local_functions` are only those defined in this file.
+- Reject inherit cycles and paths that escape the mudlib with `..`.
+- Unknown call names become `Op::CallEfun` at compile time; local/inherited names become `Op::Call`.
+- Synthesize `create` when missing after inherit merge (see codegen).
+- Prefer grammar/AST/opcode changes over special-casing in the interpreter.
+- Keep parse errors tied to the object path (`while parsing /foo`).
+- Array literal `({ ... })` may be rewritten toward `[ ... ]` before parse; do not break that without updating the lexer/parser together.
+- Document new syntax in `docs/LPC.md` and add a compile test that exercises it.

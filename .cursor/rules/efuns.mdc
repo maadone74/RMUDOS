@@ -1,0 +1,31 @@
+---
+description: Efun implementation and MudOS func_spec compatibility
+globs: src/efun/**/*.rs
+alwaysApply: false
+---
+
+# Efuns
+
+MudOS defines prototypes in `func_spec.c` and implements them in `efuns_main.c`, `efuns_port.c`, `eoperators.c`, plus `packages/*_spec.c`.
+
+rmudos registers functions in `EfunTable::new` (`src/efun/mod.rs`). The compiler emits `CallEfun` for names that are not local/inherited functions.
+
+## Adding an efun
+
+1. Read the MudOS prototype in `func_spec.c` (or package spec) and the C body.
+2. Implement `fn(&mut Interpreter, Vec<LpcValue>) -> Result<LpcValue>`.
+3. `require` arity; 1-based argument indices in error strings (existing helpers).
+4. Insert into `EfunTable::new`.
+5. Document in `docs/EFUNS.md`.
+6. Add a test (compile a tiny LPC snippet or call the efun through the interpreter).
+
+## Semantics to match when porting
+
+- `this_object` is **not** an efun table entry; it is `Op::ThisObject`.
+- `clone_object` / `load_object` / `find_object` use `normalize_object_path`.
+- Messaging: `write` goes to `this_player` else current interactive; `say` is others in the room; `tell_room` / `message` support exclude lists.
+- Do not add simul_efun rewriting unless implementing that layer on purpose.
+- Packages (db/mysql, sockets, uids, parser, math) stay out of the core table until there is a module and a feature flag or submodule — do not dump MySQL into `mod.rs` as a pile of C FFI.
+- Prefer mudlib helpers when an efun is rarely used and easy to write in LPC on the current subset.
+
+`this_player`, `previous_object`, and world lookups go through `Interpreter` / `MudWorld`, never process globals.
