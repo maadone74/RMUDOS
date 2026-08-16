@@ -100,13 +100,14 @@ impl MudWorld {
             .collect()
     }
 
-    pub fn apply(
+    pub fn apply_with_origin(
         &self,
         object: ORef,
         function: &str,
         arguments: Vec<value::LpcValue>,
         this_player: Option<ORef>,
         previous_object: Option<ORef>,
+        origin: &'static str,
     ) -> Result<value::LpcValue> {
         thread_local! {
             static APPLY_DEPTH: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -161,6 +162,7 @@ impl MudWorld {
         let result = (|| {
             let mut interpreter =
                 Interpreter::new(self, target, this_player, previous_object, self.config.max_cost);
+            interpreter.origin = origin;
             // Missing applies are soft-noops for optional hooks.
             let program = interpreter.current_object.lock().program.clone();
             if Interpreter::find_function(&program, function).is_none() {
@@ -174,6 +176,24 @@ impl MudWorld {
         });
         APPLY_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
         result
+    }
+
+    pub fn apply(
+        &self,
+        object: ORef,
+        function: &str,
+        arguments: Vec<value::LpcValue>,
+        this_player: Option<ORef>,
+        previous_object: Option<ORef>,
+    ) -> Result<value::LpcValue> {
+        self.apply_with_origin(
+            object,
+            function,
+            arguments,
+            this_player,
+            previous_object,
+            "call_other",
+        )
     }
 
     pub fn load_object(&self, path: &str) -> Result<ORef> {
@@ -275,8 +295,21 @@ impl MudWorld {
             g.environment = Some(Arc::downgrade(destination));
         }
         destination.lock().inventory.push(object.clone());
-        let _ = self.apply(destination.clone(), "init", Vec::new(), None, None);
-        let _ = self.apply(object.clone(), "init", Vec::new(), None, None);
+        // MudOS: room/object init during a move sees the moving object as this_player.
+        let _ = self.apply(
+            destination.clone(),
+            "init",
+            Vec::new(),
+            Some(object.clone()),
+            Some(object.clone()),
+        );
+        let _ = self.apply(
+            object.clone(),
+            "init",
+            Vec::new(),
+            Some(object.clone()),
+            Some(object.clone()),
+        );
         Ok(())
     }
 
@@ -319,7 +352,9 @@ impl MudWorld {
                 guard.heart_beat != 0 && guard.program.has_function("heart_beat")
             };
             if enabled {
-                if let Err(error) = self.apply(object, "heart_beat", Vec::new(), None, None) {
+                if let Err(error) =
+                    self.apply_with_origin(object, "heart_beat", Vec::new(), None, None, "driver")
+                {
                     tracing::warn!(error = %format!("{error:#}"), "heart_beat failed");
                 }
             }
@@ -332,12 +367,13 @@ impl MudWorld {
                 continue;
             }
             let result = match &entry.fun {
-                LpcValue::String(name) => self.apply(
+                LpcValue::String(name) => self.apply_with_origin(
                     entry.object.clone(),
                     name,
                     entry.args.clone(),
                     None,
                     None,
+                    "call_out",
                 ),
                 LpcValue::Function(function) => {
                     let mut interpreter = Interpreter::new(
@@ -347,6 +383,7 @@ impl MudWorld {
                         None,
                         self.config.max_cost,
                     );
+                    interpreter.origin = "call_out";
                     interpreter.call_lpc_function(function, entry.args.clone())
                 }
                 other => Err(anyhow::anyhow!(
@@ -397,12 +434,27 @@ impl MudWorld {
         if run_process_input {
             let pending = player.lock().pending_input.take();
             if let Some(pending) = pending {
+                // Keep a copy so a failed callback does not drop the prompt and fall
+                // through to cmd_hook (which can hang on FS-backed command rehash).
+                let restore = pending.clone();
                 if pending.no_echo {
                     let _ = player.lock().set_echo(true);
                 }
+                // Trim like normal commands so telnet CR/space-only lines work in pagers.
+                let line = line.trim_end_matches(['\r', '\n']).to_string();
                 let mut args = vec![value::LpcValue::String(line)];
                 args.extend(pending.extra);
-                return self.apply_input_callback(player, pending.fun, args);
+                let result =
+                    self.apply_input_callback(player.clone(), pending.owner, pending.fun, args);
+                if let Err(error) = &result {
+                    player.lock().pending_input = Some(restore);
+                    player.lock().write(format!(
+                        "Error: {error:#}\n(Still waiting for input — try again or type q.)\n"
+                    ));
+                    tracing::warn!(error = %format!("{error:#}"), "input_to callback failed");
+                    return Ok(value::LpcValue::Int(0));
+                }
+                return result;
             }
         }
 
@@ -496,7 +548,10 @@ impl MudWorld {
                 continue;
             }
             let actions = target.lock().actions.clone();
-            for action in actions {
+            // MudOS tries the most recently added action first (LIFO). Rooms
+            // register use_stupid_exit for all compass verbs, then use_exit for
+            // real exits — FIFO would always hit "You cannot go that way."
+            for action in actions.into_iter().rev() {
                 let matches = if catch_all_pass {
                     if !action.catch_all {
                         false
@@ -550,16 +605,18 @@ impl MudWorld {
     fn apply_input_callback(
         &self,
         player: ORef,
+        owner: ORef,
         fun: value::LpcValue,
         arguments: Vec<value::LpcValue>,
     ) -> Result<value::LpcValue> {
         match fun {
             value::LpcValue::String(name) => {
-                self.apply(player.clone(), &name, arguments, Some(player), None)
+                // Callback runs on the object that called input_to; this_player is the interactive.
+                self.apply(owner, &name, arguments, Some(player), None)
             }
             value::LpcValue::Function(function) => {
                 let mut interpreter =
-                    Interpreter::new(self, player.clone(), Some(player), None, self.config.max_cost);
+                    Interpreter::new(self, owner, Some(player), None, self.config.max_cost);
                 interpreter.call_lpc_function(&function, arguments)
             }
             other => anyhow::bail!(

@@ -1,20 +1,20 @@
 encumbrance 1
 props (["general":(["hp":1,"max_hp":50,"sp":1,"max_sp":1,"exp buffer":0]),"light":0])
-true_name "rylo"
+true_name "tpysy"
 creator "/adm/obj/login#1"
 material 0
 possible_to_close 0
 is_closed 0
 max_internal_encumbrance 0
 deaths 0
-player_data (["general":(["hp":3,"max_hp":50,"sp":1,"max_sp":0,"exp buffer":0])])
-magic (["points":0,"max points":0])
+player_data (["general":(["hp":1,"max_hp":50,"sp":1,"max_sp":0,"exp buffer":0])])
+magic ([])
 severed ([])
 healing ([])
 body ([])
 limbs ({})
 all_my_fingers 0
-heal_rate 1
+heal_rate 2
 char_class 0
 skills (["melee":(["level":0,"points":0,"max":0]),"attack":(["level":0,"points":0,"max":0])])
 spells ([])
@@ -34,11 +34,11 @@ parry_bonus 0
 has_shield 0
 skill 0
 y 0
-env_var (["SCORE":"off","TERM":"unknown"])
+env_var (["SCORE":"off","TERM":"unknown","start":"/d/standard/setter"])
 money 0
 invis 0
-ok_to_heal 14
-player_age 2
+ok_to_heal 0
+player_age 0
 sight_bonus 0
 description 0
 gender "male"
@@ -47,8 +47,8 @@ languages 0
 primary_language 0
 language_exp 0
 xp_to_next_dev 0
-alias (["exa":"look at $*","i":"inventory","l":"look $*","bio":"biography","e":"east","w":"west","n":"north","s":"south","u":"up","d":"down","ne":"northeast","nw":"northwest","sw":"southwest","se":"southeast"])
-xverb (["$'":"say $*","$"":"say $*","$:":"emote $*"])
+alias ([])
+xverb ([])
 nicknames 0
 auto_load ({})
 bitflags 0
@@ -62,7 +62,7 @@ ghost 0
 crash_money 0
 rolls 0
 verbose_moves 1
-birth 1786920954
+birth 1786914854
 blocked 0
 colours 0
 bank 0
@@ -71,14 +71,14 @@ keep 0
 snatch "off"
 default_who 0
 inf_block ({})
-real_name "dev"
-email "d@d.com"
-ip "192.168.7.194"
-last_on "ctime(1786920954)"
-password "EM3779cb3c994"
+real_name "Tester"
+email "tpysy34292@example.com"
+ip "127.0.0.1"
+last_on "ctime(1786914854)"
+password "07267a6a6cb5e3"
 cpath 0
 race 0
-original_site "192.168.7.194"
+original_site "127.0.0.1"
 position "player"
 primary_start 0
 mini_quests 0

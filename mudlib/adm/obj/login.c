@@ -237,10 +237,13 @@ private void exec_user() {
         return; 
       } 
     __Player->setup();
+    // Skip mudlock INFORM: first load of INFORM_D (and related) can hang login.
+    /*
     if(!wizardp(__Player) && (int)master()->is_locked())
         INFORM_D->do_inform("watch_register",
           "[%^YELLOW%^%^BOLD%^SECURITY%^RESET%^] "+__Name+" -> "+
           query_ip_number()+ " Mudlock Violation.");
+    */
     __Player = 0; 
     destruct(this_object()); 
   } 
@@ -278,6 +281,7 @@ nomask protected void npass2(string pass) {
         message("logon","\nThe passwords must match.\n",this_object());
 	message("logon","Re-enter new password:",this_object());
 	input_to("new_pass");
+	return;
     }
     pass = crypt(pass, 0);
     __Player->set_password(pass);

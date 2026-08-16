@@ -233,6 +233,10 @@ nomask protected int cmd_hook(string cmd) {
 
     verb = query_verb();
     did_command(cmd);
+    /* During character creation, skip CMD_D lookup — rehash/get_dir can hang
+     * on cloud FS and freezes the session for all further input. */
+    if(query("in creation"))
+	return 0;
     if(!cmd) abcmd = 0;
     else if(sizeof(explode(cmd, " ")) > 4)
       abcmd = implode(explode(cmd, " ")[0..3], " ");
@@ -243,9 +247,8 @@ nomask protected int cmd_hook(string cmd) {
 	return 1;
     }
     if(!(file = (string)CMD_D->find_cmd(verb, search_path))) {
-	if(!((int)SOUL_D->do_cmd(verb, abcmd))) 
-	    return (int)CHAT_D->do_chat(verb, cmd);
-	else return 1;
+	/* Skip SOUL_D / CHAT_D fallback: first SOUL_D load hangs this driver. */
+	return 0;
     }
     return (int)call_other(file, "cmd_"+verb, cmd);
 }
@@ -341,7 +344,7 @@ void do_healing(int x) {
 	tmp += props["extra mp regen"] * tmp / 100;
     if(x < 20 && query_stoned() < 10 && this_object()->is_player()) tmp /= 3;
     add_mp(tmp);
-    adjust_biorhythms();
+    catch(adjust_biorhythms());
     if(query_poisoning()) {
 	message("info","%^GREEN%^You take poison damage.",this_object());
 	this_object()->add_hp(-(1 + (int)this_object()->query_poisoning() / 5));

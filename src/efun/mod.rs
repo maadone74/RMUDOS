@@ -44,6 +44,7 @@ impl EfunTable {
         functions.insert("file_name", file_name);
         functions.insert("this_player", this_player);
         functions.insert("previous_object", previous_object);
+        functions.insert("origin", origin_efun);
         functions.insert("users", users);
         functions.insert("call_other", call_other);
         functions.insert("getuid", getuid);
@@ -67,6 +68,7 @@ impl EfunTable {
         functions.insert("pointerp", pointerp);
         functions.insert("mapp", mapp);
         functions.insert("time", time);
+        functions.insert("random", random_efun);
         functions.insert("debug_message", debug_message);
         functions.insert("shutdown", shutdown);
         functions.insert("set_heart_beat", set_heart_beat);
@@ -110,10 +112,22 @@ fn write(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<
         .iter()
         .map(ToString::to_string)
         .collect::<String>();
-    let recipient = interpreter
-        .this_player
-        .clone()
-        .unwrap_or_else(|| interpreter.current_object.clone());
+    // After exec(), this_player may still be the login object (no socket) while
+    // current_object is the interactive /std/user. Prefer an interactive recipient.
+    let recipient = {
+        let current = interpreter.current_object.clone();
+        if current.lock().interactive.is_some() {
+            current
+        } else if let Some(player) = interpreter.this_player.clone() {
+            if player.lock().interactive.is_some() {
+                player
+            } else {
+                current
+            }
+        } else {
+            current
+        }
+    };
     recipient.lock().write(message);
     Ok(LpcValue::Int(1))
 }
@@ -526,6 +540,10 @@ fn previous_object(
         .unwrap_or(LpcValue::Null))
 }
 
+fn origin_efun(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    Ok(LpcValue::String(interpreter.origin.to_owned()))
+}
+
 fn users(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
     Ok(LpcValue::Array(
         interpreter
@@ -654,7 +672,7 @@ fn sprintf(_interpreter: &mut Interpreter<'_>, mut arguments: Vec<LpcValue>) -> 
         .remove(0)
         .into_string()
         .context("sprintf format must be a string")?;
-    let mut values = arguments.into_iter();
+    let mut values = arguments.into_iter().peekable();
     let mut output = String::new();
     let mut chars = format.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -667,42 +685,210 @@ fn sprintf(_interpreter: &mut Interpreter<'_>, mut arguments: Vec<LpcValue>) -> 
             output.push('%');
             continue;
         }
-        let left_align = if chars.peek() == Some(&'-') {
-            chars.next();
-            true
-        } else {
-            false
-        };
-        let mut width = String::new();
-        while chars.peek().is_some_and(char::is_ascii_digit) {
-            width.push(chars.next().expect("peeked character"));
+
+        // MudOS modifiers may appear in any order before the type letter.
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum Align {
+            Right,
+            Left,
+            Center,
         }
+        let mut align = Align::Right;
+        let mut pad = " ".to_owned();
+        let mut zero_pad = false;
+        let mut show_plus = false;
+        let mut space_positive = false;
+        let mut width: Option<usize> = None;
+        let mut precision: Option<usize> = None;
+
+        loop {
+            match chars.peek().copied() {
+                Some('-') => {
+                    chars.next();
+                    align = Align::Left;
+                }
+                Some('|') => {
+                    chars.next();
+                    align = Align::Center;
+                }
+                Some('+') => {
+                    chars.next();
+                    show_plus = true;
+                }
+                Some(' ') => {
+                    chars.next();
+                    space_positive = true;
+                }
+                Some('0') if width.is_none() => {
+                    chars.next();
+                    zero_pad = true;
+                    pad = "0".to_owned();
+                }
+                Some('\'') => {
+                    chars.next();
+                    let mut pad_chars = String::new();
+                    while let Some(c) = chars.next() {
+                        if c == '\'' {
+                            break;
+                        }
+                        if c == '\\' {
+                            if let Some(escaped) = chars.next() {
+                                pad_chars.push(escaped);
+                            }
+                        } else {
+                            pad_chars.push(c);
+                        }
+                    }
+                    if !pad_chars.is_empty() {
+                        pad = pad_chars;
+                    }
+                }
+                Some('*') => {
+                    chars.next();
+                    let w = values
+                        .next()
+                        .and_then(|v| v.as_int())
+                        .context("sprintf %* requires an integer width")?;
+                    width = Some(w.max(0) as usize);
+                }
+                Some(c) if c.is_ascii_digit() => {
+                    let mut digits = String::new();
+                    while chars.peek().is_some_and(char::is_ascii_digit) {
+                        digits.push(chars.next().expect("digit"));
+                    }
+                    width = Some(digits.parse().unwrap_or(0));
+                }
+                Some('.') => {
+                    chars.next();
+                    if chars.peek() == Some(&'*') {
+                        chars.next();
+                        let p = values
+                            .next()
+                            .and_then(|v| v.as_int())
+                            .context("sprintf %.* requires an integer precision")?;
+                        precision = Some(p.max(0) as usize);
+                    } else {
+                        let mut digits = String::new();
+                        while chars.peek().is_some_and(char::is_ascii_digit) {
+                            digits.push(chars.next().expect("digit"));
+                        }
+                        precision = Some(digits.parse().unwrap_or(0));
+                    }
+                }
+                Some(':') => {
+                    chars.next();
+                    let mut digits = String::new();
+                    while chars.peek().is_some_and(char::is_ascii_digit) {
+                        digits.push(chars.next().expect("digit"));
+                    }
+                    let n: usize = digits.parse().unwrap_or(0);
+                    width = Some(n);
+                    precision = Some(n);
+                }
+                Some('=' | '#' | '$') => {
+                    // Column/table/justify: ignored for simple formatting.
+                    chars.next();
+                }
+                _ => break,
+            }
+        }
+
         let specifier = chars.next().context("incomplete sprintf directive")?;
-        let value = values.next().context("not enough sprintf arguments")?;
-        let formatted = match specifier {
-            's' => value.to_string(),
-            'd' | 'i' => value
-                .as_int()
-                .context("sprintf %d requires an integer")?
-                .to_string(),
-            'f' => match value {
-                LpcValue::Float(value) => value.to_string(),
-                LpcValue::Int(value) => (value as f64).to_string(),
-                _ => bail!("sprintf %f requires a number"),
-            },
-            'O' => value.lpc_repr(),
+        if zero_pad && pad == " " {
+            pad = "0".to_owned();
+        }
+
+        let mut formatted = match specifier {
+            's' => {
+                let mut text = values
+                    .next()
+                    .context("not enough sprintf arguments")?
+                    .to_string();
+                if let Some(p) = precision {
+                    text = text.chars().take(p).collect();
+                }
+                text
+            }
+            'c' => {
+                let value = values.next().context("not enough sprintf arguments")?;
+                match value {
+                    LpcValue::Int(code) => char::from_u32(code as u32)
+                        .unwrap_or('?')
+                        .to_string(),
+                    LpcValue::String(s) => s.chars().next().unwrap_or('?').to_string(),
+                    _ => bail!("sprintf %c requires int or string"),
+                }
+            }
+            'd' | 'i' => {
+                let n = values
+                    .next()
+                    .context("not enough sprintf arguments")?
+                    .as_int()
+                    .context("sprintf %d requires an integer")?;
+                let mut text = n.to_string();
+                if n >= 0 {
+                    if show_plus {
+                        text = format!("+{text}");
+                    } else if space_positive {
+                        text = format!(" {text}");
+                    }
+                }
+                text
+            }
+            'f' => {
+                let value = values.next().context("not enough sprintf arguments")?;
+                match value {
+                    LpcValue::Float(v) => {
+                        if let Some(p) = precision {
+                            format!("{v:.p$}")
+                        } else {
+                            v.to_string()
+                        }
+                    }
+                    LpcValue::Int(v) => {
+                        let v = v as f64;
+                        if let Some(p) = precision {
+                            format!("{v:.p$}")
+                        } else {
+                            v.to_string()
+                        }
+                    }
+                    _ => bail!("sprintf %f requires a number"),
+                }
+            }
+            'O' => values
+                .next()
+                .context("not enough sprintf arguments")?
+                .lpc_repr(),
             other => bail!("unsupported sprintf directive %{other}"),
         };
-        let width: usize = width.parse().unwrap_or(0);
-        if formatted.len() >= width {
-            output.push_str(&formatted);
-        } else if left_align {
-            output.push_str(&formatted);
-            output.push_str(&" ".repeat(width - formatted.len()));
-        } else {
-            output.push_str(&" ".repeat(width - formatted.len()));
-            output.push_str(&formatted);
+
+        if let Some(w) = width {
+            if formatted.chars().count() < w {
+                let pad_len = w - formatted.chars().count();
+                let pad_unit = if pad.is_empty() { " " } else { pad.as_str() };
+                let make_pad = |n: usize| -> String {
+                    if n == 0 {
+                        return String::new();
+                    }
+                    let mut out = String::new();
+                    while out.chars().count() < n {
+                        out.push_str(pad_unit);
+                    }
+                    out.chars().take(n).collect()
+                };
+                formatted = match align {
+                    Align::Left => format!("{}{}", formatted, make_pad(pad_len)),
+                    Align::Right => format!("{}{}", make_pad(pad_len), formatted),
+                    Align::Center => {
+                        let left = pad_len / 2;
+                        let right = pad_len - left;
+                        format!("{}{}{}", make_pad(left), formatted, make_pad(right))
+                    }
+                };
+            }
         }
+        output.push_str(&formatted);
     }
     Ok(LpcValue::String(output))
 }
@@ -786,6 +972,35 @@ fn time(_interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result
     Ok(LpcValue::Int(seconds as i64))
 }
 
+/// MudOS `random(n)` — integer in `[0, n)`.
+fn random_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "random")?;
+    let n = arguments[0]
+        .as_int()
+        .context("random requires an integer")?;
+    if n <= 0 {
+        return Ok(LpcValue::Int(0));
+    }
+    thread_local! {
+        static STATE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    }
+    let value = STATE.with(|state| {
+        let mut s = state.get();
+        if s == 0 {
+            s = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0x9e37_79b9_7f4a_7c15);
+            s ^= s << 13;
+        }
+        // Numerical Recipes LCG
+        s = s.wrapping_mul(1664525).wrapping_add(1013904223);
+        state.set(s);
+        (s % (n as u64)) as i64
+    });
+    Ok(LpcValue::Int(value))
+}
+
 fn debug_message(
     _interpreter: &mut Interpreter<'_>,
     arguments: Vec<LpcValue>,
@@ -844,12 +1059,27 @@ fn input_to(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resu
     } else {
         arguments[1..].to_vec()
     };
+    // MudOS binds input_to to the interactive player (command giver), not
+    // necessarily current_object (e.g. room code calling input_to during pick).
+    let owner = interpreter.current_object.clone();
+    let target = {
+        let from_player = interpreter.this_player.clone().filter(|p| {
+            !p.lock().destructed && p.lock().interactive.is_some()
+        });
+        let from_current = (!owner.lock().destructed && owner.lock().interactive.is_some())
+            .then(|| owner.clone());
+        from_player
+            .or(from_current)
+            .or_else(|| interpreter.this_player.clone())
+            .unwrap_or_else(|| owner.clone())
+    };
     {
-        let mut object = interpreter.current_object.lock();
+        let mut object = target.lock();
         if no_echo {
             let _ = object.set_echo(false);
         }
         object.pending_input = Some(PendingInput {
+            owner,
             fun,
             extra,
             no_echo,

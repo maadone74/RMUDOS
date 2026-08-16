@@ -127,12 +127,11 @@ who->reset_xp_to_dev();
 	return 1;
     }
     printf("Ok.\nCreating your character...");
-    g_dir = get_dir("/d/damned/guilds/join_rooms/*_join.c");
-    i = sizeof(g_dir);
+    /* Skip guild join_rooms get_dir/kick: cloud FS listing hangs this driver.
+     * New characters are not guild members yet anyway. */
+    g_dir = ({});
     name = (string)this_player()->query_name();
-    while(i--)
-	call_other("/d/damned/guilds/join_rooms/"+g_dir[i], "kick_member",
-	  name);
+    i = 0;
     who->remove_property("lycanthrope moon");
     who->set_overall_ac(0);
     who->remove_property("extra mp regen");
@@ -207,12 +206,21 @@ who = this_player();
   
   if(str && lower_case(str) != "q") {
     str = lower_case(str);
-    idx = member_array(str, STATS, 1);
+    // Prefix match first letters of STATS (do not rely on member_array flag).
+    idx = -1;
+    i = sizeof(STATS);
+    while(i--) {
+      if(stringp(STATS[i]) && strlen(STATS[i]) >= strlen(str) &&
+        STATS[i][0..strlen(str)-1] == str) {
+          idx = i;
+          break;
+      }
+    }
     if(idx < 0) {
-      write("'"+str+"' is not one of the available stats.\n");
-      printf("Press [enter] to continue: ");
-      input_to("press_enter", 0, points, pts_left);
-      return;
+	write("'"+str+"' is not one of the available stats.\n");
+	printf("Press [enter] to continue: ");
+	input_to("press_enter", 0, points, pts_left);
+	return;
     }
 if(strlen(str) >= 2 && str[0..1] == "ch") m = 2;
     else m = 1;
@@ -366,12 +374,15 @@ void press_enter(string null, int *points, int pts_left) {
 void pick_stat(string str, int *points, int pts_left) {
   int pts;
   
-  if(str && lower_case(str) == "q") {
+  if(str) str = lower_case(str);
+  if(str == "q") {
     assign_point("q", points, pts_left);
     return;
   }
-  if(!str || !sscanf(str, "%d", pts)) {
-    printf("\nPlease enter a number ('q' to quit): ");
+  /* Reject non-numeric input without falling out of the prompt. */
+  if(!str || str == "" || !sscanf(str, "%d", pts)) {
+    write("That is not a valid point amount.\n");
+    printf("Please enter a number ('q' to quit): ");
     input_to("pick_stat", 0, points, pts_left);
     return;
   }

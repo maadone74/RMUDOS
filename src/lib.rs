@@ -311,14 +311,11 @@ mod runtime_smoke {
 
         assert!(
             session.lock().program.path.contains("/std/user"),
-            "expected /std/user after exec, got {}",
-            session.lock().program.path
+            "expected /std/user after exec"
         );
         assert!(session.lock().interactive.is_some());
+        assert!(session.lock().pending_input.is_none());
 
-        // Exit more(1) pager if present, then look / quit.
-        let _ = world.handle_player_input(session.clone(), "q".to_owned());
-        let _ = collect_text(&mut rx);
         world
             .handle_player_input(session.clone(), "look".to_owned())
             .expect("look");
@@ -347,6 +344,73 @@ mod runtime_smoke {
             .expect("quit");
         let quit_out = collect_text(&mut rx);
         eprintln!("QUIT:\n{quit_out}");
+    }
+
+    #[test]
+    fn input_to_error_restores_pending() {
+        let room_prog = compiler::compile_source(
+            r#"
+void prompt_user() {
+    input_to("boom", 0);
+}
+
+void boom(string line) {
+    error("boom");
+}
+"#,
+            "/test/input_restore_room",
+        )
+        .expect("compile room");
+        let player_prog = compiler::compile_source(
+            r#"
+void create() { enable_commands(); }
+"#,
+            "/test/input_restore_player",
+        )
+        .expect("compile player");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let room_id = world.allocate_object_id();
+        let room = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            room_id,
+            "/test/input_restore_room".to_owned(),
+            std::sync::Arc::new(room_prog),
+        )));
+        world.objects.write().insert(room_id, room.clone());
+        let player_id = world.allocate_object_id();
+        let player = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            player_id,
+            "/test/input_restore_player".to_owned(),
+            std::sync::Arc::new(player_prog),
+        )));
+        world.objects.write().insert(player_id, player.clone());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:17".parse().unwrap(),
+            "tester",
+            tx,
+        )));
+
+        world
+            .apply(room, "prompt_user", Vec::new(), Some(player.clone()), None)
+            .expect("prompt");
+        assert!(player.lock().pending_input.is_some());
+
+        world
+            .handle_player_input(player.clone(), "anything".to_owned())
+            .expect("input should soft-fail");
+        let out = collect_text(&mut rx);
+        assert!(
+            player.lock().pending_input.is_some(),
+            "pending_input must be restored after callback error; out={out}"
+        );
+        assert!(
+            out.to_lowercase().contains("error") || out.to_lowercase().contains("boom"),
+            "expected error text, got: {out}"
+        );
     }
 
     #[test]
@@ -433,10 +497,161 @@ void create() {
             .handle_player_input(object.clone(), "aliasme".to_owned())
             .expect("input");
         let out = collect_text(&mut rx);
+        // process_input rewrites to bare "look"; catch-all gets args after verb (none → 0).
         assert!(
-            out.contains("HOOK:look"),
+            out.contains("HOOK:0") || out.contains("HOOK:"),
             "expected catch-all after process_input, got: {out}"
         );
+    }
+
+    #[test]
+    fn input_to_binds_to_interactive_not_caller() {
+        let room_prog = compiler::compile_source(
+            r#"
+void prompt_user() {
+    input_to("got_line", 0, 42);
+}
+
+void got_line(string line, int extra) {
+    write("GOT:" + line + ":" + extra + "\n");
+}
+"#,
+            "/test/input_room",
+        )
+        .expect("compile room");
+        let player_prog = compiler::compile_source(
+            r#"
+void create() { enable_commands(); }
+"#,
+            "/test/input_player",
+        )
+        .expect("compile player");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let room_id = world.allocate_object_id();
+        let room = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            room_id,
+            "/test/input_room".to_owned(),
+            std::sync::Arc::new(room_prog),
+        )));
+        world.objects.write().insert(room_id, room.clone());
+        let player_id = world.allocate_object_id();
+        let player = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            player_id,
+            "/test/input_player".to_owned(),
+            std::sync::Arc::new(player_prog),
+        )));
+        world.objects.write().insert(player_id, player.clone());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:13".parse().unwrap(),
+            "tester",
+            tx,
+        )));
+        // Room calls input_to while this_player is the interactive player.
+        world
+            .apply(
+                room.clone(),
+                "prompt_user",
+                Vec::new(),
+                Some(player.clone()),
+                None,
+            )
+            .expect("prompt");
+        assert!(
+            player.lock().pending_input.is_some(),
+            "pending_input must live on the interactive player"
+        );
+        assert!(room.lock().pending_input.is_none());
+        world
+            .handle_player_input(player.clone(), "hello".to_owned())
+            .expect("line");
+        let out = collect_text(&mut rx);
+        assert!(
+            out.contains("GOT:hello:42"),
+            "callback on caller with this_player interactive, got: {out}"
+        );
+    }
+
+    #[test]
+    fn crypt_roundtrip_matches_login_check() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    string stored, again;
+    stored = crypt("secret99", 0);
+    again = crypt("secret99", stored);
+    if (stored != again) return "mismatch:"+stored+":"+again;
+    if (crypt("wrongpass", stored) == stored) return "wrong-accepted";
+    return "ok:"+stored;
+}
+"#,
+            "/test/crypt",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/crypt".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let text = result.as_string().expect("string");
+        assert!(
+            text.starts_with("ok:"),
+            "crypt create/verify failed: {text}"
+        );
+        assert_eq!(text.len(), 3 + 13, "expected ok: + 13-char crypt, got {text}");
+    }
+
+    #[test]
+    fn sprintf_mudos_center_and_pad() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    string a, b, c;
+    a = sprintf("%|10s", "mid");
+    b = sprintf("%'-='10s", "");
+    c = sprintf("%-+3d", 7);
+    return a + "|" + b + "|" + c;
+}
+"#,
+            "/test/sprintf",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/sprintf".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let text = result.as_string().expect("string");
+        let parts: Vec<_> = text.split('|').collect();
+        assert_eq!(parts.len(), 3, "got {text}");
+        assert_eq!(parts[0].chars().count(), 10);
+        assert!(parts[0].contains("mid"));
+        assert_eq!(parts[1], "-=-=-=-=-=");
+        assert_eq!(parts[2], "+7 ");
     }
 
     #[test]

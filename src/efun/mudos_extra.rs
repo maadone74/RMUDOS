@@ -33,6 +33,18 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("strsrch", strsrch);
     functions.insert("to_int", to_int_efun);
     functions.insert("to_float", to_float_efun);
+    functions.insert("pow", pow_efun);
+    functions.insert("sqrt", sqrt_efun);
+    functions.insert("sin", sin_efun);
+    functions.insert("cos", cos_efun);
+    functions.insert("tan", tan_efun);
+    functions.insert("asin", asin_efun);
+    functions.insert("acos", acos_efun);
+    functions.insert("atan", atan_efun);
+    functions.insert("log", log_efun);
+    functions.insert("exp", exp_efun);
+    functions.insert("floor", floor_efun);
+    functions.insert("ceil", ceil_efun);
     functions.insert("ctime", ctime);
     functions.insert("allocate", allocate);
     functions.insert("allocate_mapping", allocate_mapping);
@@ -69,6 +81,21 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("bind", bind_efun);
     functions.insert("map", map_array_alias);
     functions.insert("filter", filter_array_alias);
+    // Socket efuns: stubs until real MudOS sockets are implemented.
+    // Network daemons call these from call_out("setup"); returning EESOCKET
+    // lets them soft-fail instead of aborting with "unknown efun".
+    functions.insert("socket_create", socket_create);
+    functions.insert("socket_bind", socket_unsupported);
+    functions.insert("socket_listen", socket_unsupported);
+    functions.insert("socket_accept", socket_unsupported);
+    functions.insert("socket_connect", socket_unsupported);
+    functions.insert("socket_write", socket_unsupported);
+    functions.insert("socket_close", socket_close_stub);
+    functions.insert("socket_release", socket_unsupported);
+    functions.insert("socket_acquire", socket_unsupported);
+    functions.insert("socket_address", socket_address_stub);
+    functions.insert("socket_error", socket_error_stub);
+    functions.insert("dump_socket_status", dump_socket_status);
 }
 
 fn require(arguments: &[LpcValue], count: usize, name: &str) -> Result<()> {
@@ -617,6 +644,92 @@ fn to_float_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -
     Ok(LpcValue::Float(value))
 }
 
+fn as_float_arg(value: &LpcValue) -> f64 {
+    match value {
+        LpcValue::Float(v) => *v,
+        LpcValue::Int(v) => *v as f64,
+        LpcValue::String(s) => s.trim().parse::<f64>().unwrap_or(0.0),
+        LpcValue::Null => 0.0,
+        _ => value.as_int().unwrap_or(0) as f64,
+    }
+}
+
+fn pow_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "pow")?;
+    let base = as_float_arg(&arguments[0]);
+    let exp = as_float_arg(&arguments[1]);
+    let result = base.powf(exp);
+    if result.is_finite() {
+        Ok(LpcValue::Float(result))
+    } else {
+        Ok(LpcValue::Float(0.0))
+    }
+}
+
+fn sqrt_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "sqrt")?;
+    let value = as_float_arg(&arguments[0]);
+    if value < 0.0 {
+        Ok(LpcValue::Float(0.0))
+    } else {
+        Ok(LpcValue::Float(value.sqrt()))
+    }
+}
+
+fn float_unary(
+    name: &str,
+    arguments: &[LpcValue],
+    f: impl FnOnce(f64) -> f64,
+) -> Result<LpcValue> {
+    require(arguments, 1, name)?;
+    let result = f(as_float_arg(&arguments[0]));
+    if result.is_finite() {
+        Ok(LpcValue::Float(result))
+    } else {
+        Ok(LpcValue::Float(0.0))
+    }
+}
+
+fn sin_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("sin", &arguments, f64::sin)
+}
+
+fn cos_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("cos", &arguments, f64::cos)
+}
+
+fn tan_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("tan", &arguments, f64::tan)
+}
+
+fn asin_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("asin", &arguments, f64::asin)
+}
+
+fn acos_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("acos", &arguments, f64::acos)
+}
+
+fn atan_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("atan", &arguments, f64::atan)
+}
+
+fn log_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("log", &arguments, |v| if v > 0.0 { v.ln() } else { 0.0 })
+}
+
+fn exp_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("exp", &arguments, f64::exp)
+}
+
+fn floor_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("floor", &arguments, f64::floor)
+}
+
+fn ceil_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    float_unary("ceil", &arguments, f64::ceil)
+}
+
 fn ctime(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     let seconds = arguments
         .first()
@@ -749,7 +862,14 @@ fn command_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> 
             LpcValue::Object(object) => Some(object.clone()),
             _ => None,
         })
-        .or_else(|| interpreter.this_player.clone())
+        .or_else(|| {
+            let current = interpreter.current_object.clone();
+            if current.lock().interactive.is_some() {
+                Some(current)
+            } else {
+                interpreter.this_player.clone()
+            }
+        })
         .unwrap_or_else(|| interpreter.current_object.clone());
     let result = interpreter.world.handle_player_command(player, line)?;
     Ok(LpcValue::Int(i64::from(result.is_truthy())))
@@ -791,17 +911,36 @@ fn exec_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Res
 fn crypt_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     require(&arguments, 1, "crypt")?;
     let password = arguments[0].to_string();
-    let salt = arguments
-        .get(1)
-        .map(ToString::to_string)
-        .unwrap_or_else(|| "rm".to_owned());
-    // Not real DES crypt — deterministic stub sufficient for mudlib development.
+    // MudOS DES crypt uses only the first two salt characters. crypt(pass, 0)
+    // (or a missing/null salt) means "choose a new salt".
+    let salt = match arguments.get(1) {
+        None | Some(LpcValue::Null) | Some(LpcValue::Int(0)) => {
+            const ALPHABET: &[u8] =
+                b"./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0x9e37_79b9_7f4a_7c15);
+            let a = ALPHABET[(nanos as usize) % ALPHABET.len()] as char;
+            let b = ALPHABET[((nanos >> 8) as usize) % ALPHABET.len()] as char;
+            format!("{a}{b}")
+        }
+        Some(value) => {
+            let text = value.to_string();
+            let mut chars = text.chars();
+            let a = chars.next().unwrap_or('.');
+            let b = chars.next().unwrap_or('.');
+            format!("{a}{b}")
+        }
+    };
     let digest = format!("{:x}", simple_hash(&format!("{salt}:{password}")));
-    Ok(LpcValue::String(format!(
-        "{}{}",
-        &salt.chars().take(2).collect::<String>(),
-        &digest[..13.min(digest.len())]
-    )))
+    let body = if digest.len() >= 11 {
+        digest[..11].to_owned()
+    } else {
+        format!("{digest:0<11}")
+    };
+    // Traditional crypt(3) style: 2-char salt + 11-char body (13 total).
+    Ok(LpcValue::String(format!("{salt}{body}")))
 }
 
 fn simple_hash(input: &str) -> u64 {
@@ -1267,6 +1406,66 @@ fn filter_array_alias(
     arguments: Vec<LpcValue>,
 ) -> Result<LpcValue> {
     super::filter_array(interpreter, arguments)
+}
+
+/// MudOS `EESOCKET` — problem creating socket / sockets unsupported.
+const EESOCKET: i64 = -1;
+/// MudOS `EEMODENOTSUPP`.
+const EEMODENOTSUPP: i64 = -12;
+
+fn socket_create(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 2, "socket_create")?;
+    // Not implemented: network daemons expect a negative error code.
+    Ok(LpcValue::Int(EESOCKET))
+}
+
+fn socket_unsupported(
+    _interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    Ok(LpcValue::Int(EEMODENOTSUPP))
+}
+
+fn socket_close_stub(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "socket_close")?;
+    // Closing a non-existent fd is treated as success in this stub.
+    Ok(LpcValue::Int(1))
+}
+
+fn socket_address_stub(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "socket_address")?;
+    Ok(LpcValue::String(String::new()))
+}
+
+fn socket_error_stub(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "socket_error")?;
+    let code = arguments[0].as_int().unwrap_or(0);
+    let msg = match code {
+        EESOCKET => "Problem creating socket",
+        EEMODENOTSUPP => "Socket mode not supported",
+        1 => "Operation successful",
+        _ => "Socket operation failed",
+    };
+    Ok(LpcValue::String(msg.to_owned()))
+}
+
+fn dump_socket_status(
+    _interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    Ok(LpcValue::Int(1))
 }
 
 #[allow(dead_code)]

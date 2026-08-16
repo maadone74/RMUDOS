@@ -11,6 +11,8 @@ pub struct Interpreter<'a> {
     pub current_object: ObjectRef,
     pub this_player: Option<ObjectRef>,
     pub previous_object: Option<ObjectRef>,
+    /// MudOS `origin()` value: driver, local, call_other, simul, call_out, efun.
+    pub origin: &'static str,
     cost: usize,
     max_cost: usize,
     call_depth: usize,
@@ -29,6 +31,7 @@ impl<'a> Interpreter<'a> {
             current_object,
             this_player,
             previous_object,
+            origin: "call_other",
             cost: 0,
             max_cost,
             call_depth: 0,
@@ -113,6 +116,16 @@ impl<'a> Interpreter<'a> {
         name: &str,
         arguments: Vec<LpcValue>,
     ) -> Result<LpcValue> {
+        self.call_function_with_origin(object, name, arguments, "call_other")
+    }
+
+    pub fn call_function_with_origin(
+        &mut self,
+        object: ObjectRef,
+        name: &str,
+        arguments: Vec<LpcValue>,
+        origin: &'static str,
+    ) -> Result<LpcValue> {
         let program = object.lock().program.clone();
         let Some(function) = Self::find_function(&program, name) else {
             // MudOS: calling a missing function via call_other / -> returns 0.
@@ -121,9 +134,11 @@ impl<'a> Interpreter<'a> {
         let old_current = std::mem::replace(&mut self.current_object, object);
         let old_previous =
             std::mem::replace(&mut self.previous_object, Some(old_current.clone()));
+        let old_origin = std::mem::replace(&mut self.origin, origin);
         let result = self.execute(function, arguments);
         self.current_object = old_current;
         self.previous_object = old_previous;
+        self.origin = old_origin;
         result
     }
 
@@ -335,8 +350,10 @@ impl<'a> Interpreter<'a> {
                     let program = self.current_object.lock().program.clone();
                     let called = Self::find_function(&program, &name)
                         .with_context(|| format!("{} has no function {name}", program.path))?;
-                    let result = self.execute(called, arguments)?;
-                    stack.push(result);
+                    let old_origin = std::mem::replace(&mut self.origin, "local");
+                    let result = self.execute(called, arguments);
+                    self.origin = old_origin;
+                    stack.push(result?);
                 }
                 Op::CallInherit(inherit, name, count) => {
                     let arguments = pop_arguments(&mut stack, count)?;
@@ -384,7 +401,22 @@ impl<'a> Interpreter<'a> {
                             self.call_lpc_function(&function, arguments)?
                         }
                         LpcValue::String(name) => {
-                            if let Some(efun) = self.world.efuns.get(name.as_str()) {
+                            // Prefer simul_efun overrides, then efun, then object method.
+                            if let Some(simul) = self.world.simul_efun() {
+                                let program = simul.lock().program.clone();
+                                if Self::find_function(&program, &name).is_some() {
+                                    self.call_function_with_origin(
+                                        simul, &name, arguments, "simul",
+                                    )?
+                                } else if let Some(efun) = self.world.efuns.get(name.as_str()) {
+                                    efun(self, arguments)?
+                                } else {
+                                    let program = self.current_object.lock().program.clone();
+                                    let called = Self::find_function(&program, &name)
+                                        .with_context(|| format!("unknown function {name}"))?;
+                                    self.execute(called, arguments)?
+                                }
+                            } else if let Some(efun) = self.world.efuns.get(name.as_str()) {
                                 efun(self, arguments)?
                             } else {
                                 let program = self.current_object.lock().program.clone();
@@ -399,11 +431,22 @@ impl<'a> Interpreter<'a> {
                 }
                 Op::CallEfun(name, count) => {
                     let arguments = pop_arguments(&mut stack, count)?;
-                    if let Some(efun) = self.world.efuns.get(&name) {
+                    // MudOS: simul_efun overrides efuns of the same name.
+                    // Use `efun::name(...)` (CallInherit) to bypass the override.
+                    if let Some(simul) = self.world.simul_efun() {
+                        let program = simul.lock().program.clone();
+                        if Self::find_function(&program, &name).is_some() {
+                            let result = self.call_function_with_origin(
+                                simul, &name, arguments, "simul",
+                            )?;
+                            stack.push(result);
+                        } else if let Some(efun) = self.world.efuns.get(&name) {
+                            stack.push(efun(self, arguments)?);
+                        } else {
+                            bail!("unknown efun {name}");
+                        }
+                    } else if let Some(efun) = self.world.efuns.get(&name) {
                         stack.push(efun(self, arguments)?);
-                    } else if let Some(simul) = self.world.simul_efun() {
-                        let result = self.call_function(simul, &name, arguments)?;
-                        stack.push(result);
                     } else {
                         bail!("unknown efun {name}");
                     }

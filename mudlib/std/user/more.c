@@ -19,7 +19,8 @@ varargs int more(mixed what, string cl, function endmore) {
       return notify_fail("Unknown file reference.\n");
     if(__More["lines"]) return notify_fail("You are in more now.\n");
     if(!(__More["class"] = cl)) __More["class"] = "info";
-    if(!(__More["screen"]=atoi((string)this_object()->getenv("LINES"))))
+    if(!(__More["screen"]=atoi((string)this_object()->getenv("LINES")))
+      || __More["screen"] < 1)
       __More["screen"] = 20;
     if(stringp(what)) {
         if(sizeof(tmp = (string *)this_object()->wild_card(what)) != 1)

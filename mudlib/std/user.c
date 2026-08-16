@@ -442,7 +442,8 @@ void setup() {
 
     set_living_name(query_name());
     seteuid(getuid());
-    set_heart_beat(1);
+    // Delay heart_beat until setup finishes so do_healing cannot interleave
+    // with login (and so SCORE can be set off in the setter first).
     if(!stats) init_stats();
     if(!skills) init_skills(0);
     if(!spells) init_spells();
@@ -489,55 +490,10 @@ void setup() {
     if(!stringp(tmp = getenv("TERM"))) setenv("TERM", tmp = "unknown");
     term_info = (mapping)TERMINAL_D->query_term_info(tmp);
     write_messages();
-    load_autoload_obj(); /* Truilkan@TMI 01/18/92 */
+    // Use message(this_object): after exec, this_player is still the login object.
+    message("login", "\nWelcome to the game. Type look or pick <race>.\n",
+      this_object());
     call_out("save_player", 2, query_name());
-    catch(PLAYER_D->add_player_info());
-    // INFORM / ROLECALL / HUNTING can be very expensive on this driver; keep new-char path lean.
-    /*
-    who_exc = ({ this_object() });
-    if(this_player()->query_invis())
-	who_exc += filter_array(users(),"filter_notanarch",this_object());
-    if(!hiddenp(this_object()))
-	INFORM_D->do_inform("logins_and_quits","Info: " +
-	  capitalize((string)this_object()->query_name()) +
-       " steps out of the forest and onto the mountain of Daybreak Ridge.",
-	  who_exc);
-    catch(ROLECALL_D->html());
-    */
-    catch(log_file("enter", "ENTER:"+
-      (string)this_object()->query_name()+
-      ":"+ctime(time())+
-      ":"+query_ip_name()+
-      ":"+query_exp()+":exp"+
-      ":"+query_money("mithril")+":mi"+
-      ":"+query_money("gold")+":gd"+
-      ":"+query_money("electrum")+":el"+
-      ":"+query_money("silver")+":sl"+
-      ":"+query_money("copper")+":cp\n"));
-    if(query_class() && stringp(query_class()) && query_class() != "child"
-      && file_exists("/d/damned/guilds/join_rooms/"+query_class()+"_join.c")) {
-	join_room = load_object("/d/damned/guilds/join_rooms/"+
-	  query_class()+"_join");
-	if(join_room && !join_room->is_member(query_name())) {
-	    write("\n--**>> YOU HAVE BEEN KICKED OUT OF YOUR GUILD!!! <<**--\n");
-	    mods = (mapping)join_room->query_property("guild mods");
-	    if(mods) {
-		mod_keys = keys(mods);
-		for(i=0;i<sizeof(mod_keys);i++) {
-		    if(this_object()->query_base_stats(mod_keys[i]))
-			this_object()->set_stats(mod_keys[i], (int)this_object()->
-			  query_base_stats(mod_keys[i]) -
-			  mods[mod_keys[i]]);
-		}
-	    }
-	    set_class("child");
-	}
-    }
-    more(explode(NEWS_D->get_news(this_object()), "\n") );
-    // Skip look during setup: more() leaves the pager active and command("look")
-    // can hang. Post-login look (telnet / integration test) works via cmd_hook.
-    // command("look");
-
     if(platinum || gold || silver || electrum || copper) {
 	add_money("electrum", electrum);
 	add_money("gold", gold);
@@ -547,25 +503,10 @@ void setup() {
 	platinum = gold = electrum = silver = copper = 0;
     }
     reset_money();
-    if(query_exp() < 0) {
-	i = (int)query_property("xp mod");
-	set_property("xp mod", 0);
-	add_exp(-1 * query_exp());
-	if(i) set_property("xp mod", i);
-    }
-    if((string)this_object()->query_race() && replace_string((string)this_object()->query_race(), "were", "") ==
-      (string)this_object()->query_race()) {
-	remove_property("lycanthrope moon");
-	delete_skill("control change");
-    }
     set_max_sp(query_stats("dexterity")*7);
     remove_property("reset max");
-    catch(HUNTING_D->set_mon_hunting(query_name(), this_object()));
-    catch(REINC_D->check_reincarnate(this_object()));
-    convert_kills();
-    if(this_object()->query_property("guild watch"))
-	catch(GUILD_D->set_last_on(query_class(), time()));
-    catch(SAVEALL_D->restore_crash_items(this_object()));
+    setenv("SCORE", "off");
+    set_heart_beat(1);
 }
 
 // Added these lines so wizzes couldn't just call heart_beat() and
@@ -945,31 +886,10 @@ void set_path(string path) {
 }
 
 void write_messages() {
-    mapping mail_stat;
-    int i;
-
     message("login", sprintf("\n        >>> Terminal currently set to %s <<<",
 	getenv("TERM")), this_object());
-    mail_stat = (mapping)LOCALPOST_D->mail_status(query_name());
-    if(mail_stat["unread"]) {
-	message("login", sprintf("\n        >>> %d of your %d %s are "
-	    "unread! <<<", mail_stat["unread"], mail_stat["total"],
-	    (mail_stat["total"]>1 ? "letters" : "letter")), this_object());
-    }
-    if(query_invis()) message("login", "\n        You are currently "
-	  "invisible.", this_object());
-    if(wizardp(this_object())) {
-	if(file_exists("/log/errors/"+query_name()))
-	    message("login", "\n        >>> You have errors in /log/errors/"+
-	      query_name()+" <<<", this_object());
-	if(file_exists("/log/reports/"+query_name()))
-	    message("login", "\n        >>> You have reports in "
-	      "/log/reports/"+query_name()+" <<<", this_object());
-    }
-    if( !message ) return;
-    for( i=0; i<sizeof(message); i++ )
-	tell_object(this_object(), message[i]);
-    message = ({ });
+    // Skip mail_status / pending message dump / wizard log checks —
+    // postal FS and related paths have been hanging login on OneDrive.
 }
 
 string query_title() {

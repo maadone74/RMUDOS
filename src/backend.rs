@@ -89,21 +89,29 @@ async fn handle_connection(
 
     while let Some(line) = line_rx.recv().await {
         let Some(player) = find_interactive_owner(&world, &interactive) else {
-            break;
+            // Interactive may briefly be unowned across exec(); wait for next line.
+            tracing::warn!("no interactive owner for connection; dropping line");
+            continue;
         };
         if player.lock().destructed {
             break;
         }
-        match world.handle_player_input(player.clone(), line) {
-            Ok(_) => {}
-            Err(e) => {
+        let world_input = world.clone();
+        let player_input = player.clone();
+        // LPC apply is sync and can be long; do not block the tokio worker.
+        match tokio::task::spawn_blocking(move || {
+            world_input.handle_player_input(player_input, line)
+        })
+        .await
+        {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
                 player.lock().write(format!("Error: {e:#}"));
                 tracing::warn!(error = format!("{e:#}"), "process_input failed");
             }
-        }
-        // Follow exec()/destruct: session ends when Interactive is no longer attached.
-        if find_interactive_owner(&world, &interactive).is_none() {
-            break;
+            Err(e) => {
+                tracing::warn!(error = format!("{e:#}"), "process_input join failed");
+            }
         }
     }
 

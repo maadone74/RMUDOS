@@ -41,6 +41,8 @@ impl Interactive {
 /// Next line of input diverted by `input_to`.
 #[derive(Clone, Debug)]
 pub struct PendingInput {
+    /// Object that called `input_to` (callback is applied here for string names).
+    pub owner: ObjectRef,
     pub fun: LpcValue,
     pub extra: Vec<LpcValue>,
     pub no_echo: bool,
