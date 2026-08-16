@@ -1,8 +1,7 @@
 //! Driver backend — accept loop, input dispatch, heartbeats.
 
-use crate::net::TelnetSession;
+use crate::net::{TelnetOut, TelnetSession};
 use crate::simulate;
-use crate::vm::value::LpcValue;
 use crate::vm::MudWorld;
 use anyhow::Result;
 use std::sync::Arc;
@@ -25,9 +24,15 @@ pub async fn run(world: Arc<MudWorld>) -> Result<()> {
     let world_hb = world.clone();
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(2));
+        let mut reset_tick = 0u64;
         loop {
             tick.tick().await;
+            world_hb.process_call_outs();
             world_hb.heartbeat();
+            reset_tick += 1;
+            if reset_tick % 30 == 0 {
+                world_hb.process_resets();
+            }
             if world_hb.is_shutting_down() {
                 break;
             }
@@ -42,7 +47,7 @@ pub async fn run(world: Arc<MudWorld>) -> Result<()> {
         let world = world.clone();
         tokio::spawn(async move {
             if let Err(e) = handle_connection(world, socket, peer).await {
-                error!(%peer, error = %e, "connection ended with error");
+                error!(%peer, error = format!("{e:#}"), "connection ended with error");
             }
         });
     }
@@ -54,7 +59,7 @@ async fn handle_connection(
     socket: tokio::net::TcpStream,
     peer: std::net::SocketAddr,
 ) -> Result<()> {
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
+    let (tx, rx) = mpsc::unbounded_channel::<TelnetOut>();
     let (line_tx, mut line_rx) = mpsc::unbounded_channel::<String>();
 
     // Start the writer before logon so welcome text is flushed.
@@ -75,41 +80,50 @@ async fn handle_connection(
             return Err(error);
         }
     };
-    let player_id = player.lock().id;
+    // Keep the Interactive Arc so we can follow `exec()` onto /std/user.
+    let interactive = player
+        .lock()
+        .interactive
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("connect did not attach interactive"))?;
 
     while let Some(line) = line_rx.recv().await {
-        let Some(player) = world.object(player_id) else {
+        let Some(player) = find_interactive_owner(&world, &interactive) else {
             break;
         };
         if player.lock().destructed {
             break;
         }
-        match world.apply(
-            player.clone(),
-            "process_input",
-            vec![LpcValue::String(line)],
-            Some(player.clone()),
-            None,
-        ) {
-            Ok(LpcValue::Int(0)) => {
-                player.lock().interactive = None;
-                break;
-            }
+        match world.handle_player_input(player.clone(), line) {
             Ok(_) => {}
             Err(e) => {
-                player.lock().write(format!("Error: {e}"));
-                tracing::warn!(error = %e, "process_input failed");
+                player.lock().write(format!("Error: {e:#}"));
+                tracing::warn!(error = format!("{e:#}"), "process_input failed");
             }
         }
-        if player.lock().destructed || player.lock().interactive.is_none() {
+        // Follow exec()/destruct: session ends when Interactive is no longer attached.
+        if find_interactive_owner(&world, &interactive).is_none() {
             break;
         }
     }
 
-    if let Some(player) = world.object(player_id) {
+    if let Some(player) = find_interactive_owner(&world, &interactive) {
         player.lock().interactive = None;
         let _ = simulate::destruct_object(&world, player);
     }
     let _ = tokio::time::timeout(std::time::Duration::from_millis(250), io).await;
     Ok(())
+}
+
+fn find_interactive_owner(
+    world: &MudWorld,
+    interactive: &Arc<crate::vm::object::Interactive>,
+) -> Option<crate::vm::ObjectRef> {
+    world.users().into_iter().find(|object| {
+        object
+            .lock()
+            .interactive
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, interactive))
+    })
 }

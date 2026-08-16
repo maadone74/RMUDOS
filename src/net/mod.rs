@@ -1,5 +1,3 @@
-//! Networking (MudOS comm / telnet subset — line-oriented).
+pub mod telnet;
 
-mod telnet;
-
-pub use telnet::TelnetSession;
+pub use telnet::{TelnetOut, TelnetSession};

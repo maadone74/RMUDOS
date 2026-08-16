@@ -1,0 +1,873 @@
+//! Additional MudOS-oriented efuns (filesystem, call_out, commands, login helpers).
+
+use crate::config::normalize_object_path;
+use crate::vm::interpret::Interpreter;
+use crate::vm::object::{Action, ObjectRef, PendingInput};
+use crate::vm::value::LpcValue;
+use anyhow::{bail, Context, Result};
+use indexmap::IndexMap;
+use std::fs;
+use std::io::Write as IoWrite;
+use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
+    functions.insert("call_out", call_out);
+    functions.insert("remove_call_out", remove_call_out);
+    functions.insert("find_call_out", find_call_out);
+    functions.insert("read_file", read_file);
+    functions.insert("write_file", write_file);
+    functions.insert("file_size", file_size);
+    functions.insert("file_exists", file_exists);
+    functions.insert("log_file", log_file);
+    functions.insert("get_dir", get_dir);
+    functions.insert("mkdir", mkdir_efun);
+    functions.insert("rm", rm_efun);
+    functions.insert("cp", cp_efun);
+    functions.insert("rename", rename_efun);
+    functions.insert("sscanf", sscanf);
+    functions.insert("replace_string", replace_string);
+    functions.insert("ctime", ctime);
+    functions.insert("allocate", allocate);
+    functions.insert("allocate_mapping", allocate_mapping);
+    functions.insert("map_delete", map_delete);
+    functions.insert("copy", copy_efun);
+    functions.insert("sort_array", sort_array);
+    functions.insert("base_name", base_name);
+    functions.insert("regexp", regexp_efun);
+    functions.insert("add_action", add_action);
+    functions.insert("notify_fail", notify_fail);
+    functions.insert("query_verb", query_verb);
+    functions.insert("command", command_efun);
+    functions.insert("commands", commands_efun);
+    functions.insert("exec", exec_efun);
+    functions.insert("crypt", crypt_efun);
+    functions.insert("user_exists", user_exists);
+    functions.insert("find_player", find_player);
+    functions.insert("find_living", find_living);
+    functions.insert("set_living_name", set_living_name);
+    functions.insert("enable_wizard", enable_wizard);
+    functions.insert("version", version_efun);
+    functions.insert("mud_name", mud_name);
+    functions.insert("mudlib", mudlib_efun);
+    functions.insert("mudlib_version", mudlib_version);
+    functions.insert("query_ip_number", query_ip_number);
+    functions.insert("query_ip_name", query_ip_name);
+    functions.insert("save_object", save_object);
+    functions.insert("restore_object", restore_object);
+    functions.insert("shadow", shadow_efun);
+    functions.insert("query_shadowing", query_shadowing);
+    functions.insert("next_shadow", next_shadow);
+    functions.insert("bind", bind_efun);
+    functions.insert("map", map_array_alias);
+    functions.insert("filter", filter_array_alias);
+}
+
+fn require(arguments: &[LpcValue], count: usize, name: &str) -> Result<()> {
+    if arguments.len() < count {
+        bail!("{name} expects at least {count} argument(s)");
+    }
+    Ok(())
+}
+
+fn resolve_mudlib_path(interpreter: &Interpreter<'_>, path: &str) -> Result<PathBuf> {
+    let path = path.replace('\\', "/");
+    let relative = path.trim_start_matches('/');
+    let mut resolved = interpreter.world.config.mudlib.clone();
+    for component in Path::new(relative).components() {
+        match component {
+            Component::Normal(part) => resolved.push(part),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !resolved.pop() {
+                    bail!("path escapes mudlib root");
+                }
+            }
+            _ => bail!("invalid path component"),
+        }
+    }
+    let mudlib = interpreter
+        .world
+        .config
+        .mudlib
+        .canonicalize()
+        .unwrap_or_else(|_| interpreter.world.config.mudlib.clone());
+    if let Ok(canon) = resolved.canonicalize() {
+        if !canon.starts_with(&mudlib) {
+            bail!("path escapes mudlib root");
+        }
+        return Ok(canon);
+    }
+    // Allow creating new files under mudlib.
+    if !resolved.starts_with(&interpreter.world.config.mudlib) {
+        bail!("path escapes mudlib root");
+    }
+    Ok(resolved)
+}
+
+fn call_out(interpreter: &mut Interpreter<'_>, mut arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "call_out")?;
+    let fun = arguments.remove(0);
+    let delay = arguments.remove(0).as_int().unwrap_or(0) as f64;
+    if !matches!(fun, LpcValue::String(_) | LpcValue::Function(_)) {
+        bail!("call_out requires a string or function");
+    }
+    let id = interpreter.world.call_outs.schedule(
+        interpreter.current_object.clone(),
+        fun,
+        delay,
+        arguments,
+    );
+    Ok(LpcValue::Int(id as i64))
+}
+
+fn remove_call_out(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "remove_call_out")?;
+    let id = arguments[0].as_int().unwrap_or(0);
+    Ok(LpcValue::Int(interpreter.world.call_outs.remove(id)))
+}
+
+fn find_call_out(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "find_call_out")?;
+    let name = arguments[0]
+        .as_string()
+        .context("find_call_out requires a function name")?;
+    Ok(LpcValue::Int(interpreter.world.call_outs.find(
+        &interpreter.current_object,
+        name,
+    )))
+}
+
+fn read_file(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "read_file")?;
+    let path = arguments[0]
+        .as_string()
+        .context("read_file requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    match fs::read_to_string(&resolved) {
+        Ok(contents) => {
+            let start = arguments.get(1).and_then(LpcValue::as_int).unwrap_or(0);
+            let number = arguments.get(2).and_then(LpcValue::as_int).unwrap_or(0);
+            if start > 0 || number > 0 {
+                let lines: Vec<&str> = contents.lines().collect();
+                let start_idx = if start > 0 { (start as usize).saturating_sub(1) } else { 0 };
+                let end_idx = if number > 0 {
+                    (start_idx + number as usize).min(lines.len())
+                } else {
+                    lines.len()
+                };
+                Ok(LpcValue::String(lines[start_idx..end_idx].join("\n")))
+            } else {
+                Ok(LpcValue::String(contents))
+            }
+        }
+        Err(_) => Ok(LpcValue::Null),
+    }
+}
+
+fn write_file(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "write_file")?;
+    let path = arguments[0]
+        .as_string()
+        .context("write_file requires a path")?;
+    let contents = arguments[1].to_string();
+    let append = arguments.get(2).map(LpcValue::is_truthy).unwrap_or(false);
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    if let Some(parent) = resolved.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let result = if append {
+        fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&resolved)
+            .and_then(|mut file| file.write_all(contents.as_bytes()))
+    } else {
+        fs::write(&resolved, contents.as_bytes())
+    };
+    Ok(LpcValue::Int(i64::from(result.is_ok())))
+}
+
+fn file_size(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "file_size")?;
+    let path = arguments[0]
+        .as_string()
+        .context("file_size requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    match fs::metadata(&resolved) {
+        Ok(meta) if meta.is_dir() => Ok(LpcValue::Int(-2)),
+        Ok(meta) => Ok(LpcValue::Int(meta.len() as i64)),
+        Err(_) => Ok(LpcValue::Int(-1)),
+    }
+}
+
+fn file_exists(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "file_exists")?;
+    let path = arguments[0]
+        .as_string()
+        .context("file_exists requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    Ok(LpcValue::Int(i64::from(resolved.exists())))
+}
+
+fn log_file(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "log_file")?;
+    let file = arguments[0].as_string().unwrap_or("driver");
+    let message = arguments[1].to_string();
+    let path = format!("/log/{file}");
+    write_file(
+        interpreter,
+        vec![
+            LpcValue::String(path),
+            LpcValue::String(message),
+            LpcValue::Int(1),
+        ],
+    )
+}
+
+fn get_dir(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "get_dir")?;
+    let path = arguments[0].as_string().context("get_dir requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let mut names = Vec::new();
+    if let Ok(entries) = fs::read_dir(&resolved) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str() {
+                names.push(LpcValue::String(name.to_owned()));
+            }
+        }
+    }
+    Ok(LpcValue::Array(names))
+}
+
+fn mkdir_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "mkdir")?;
+    let path = arguments[0].as_string().context("mkdir requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    Ok(LpcValue::Int(i64::from(fs::create_dir_all(resolved).is_ok())))
+}
+
+fn rm_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "rm")?;
+    let path = arguments[0].as_string().context("rm requires a path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let ok = if resolved.is_dir() {
+        fs::remove_dir_all(resolved).is_ok()
+    } else {
+        fs::remove_file(resolved).is_ok()
+    };
+    Ok(LpcValue::Int(i64::from(ok)))
+}
+
+fn cp_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "cp")?;
+    let from = arguments[0].as_string().context("cp from")?;
+    let to = arguments[1].as_string().context("cp to")?;
+    let src = resolve_mudlib_path(interpreter, from)?;
+    let dst = resolve_mudlib_path(interpreter, to)?;
+    if let Some(parent) = dst.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    Ok(LpcValue::Int(i64::from(fs::copy(src, dst).is_ok())))
+}
+
+fn rename_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "rename")?;
+    let from = arguments[0].as_string().context("rename from")?;
+    let to = arguments[1].as_string().context("rename to")?;
+    let src = resolve_mudlib_path(interpreter, from)?;
+    let dst = resolve_mudlib_path(interpreter, to)?;
+    if let Some(parent) = dst.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    Ok(LpcValue::Int(i64::from(fs::rename(src, dst).is_ok())))
+}
+
+fn sscanf(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "sscanf")?;
+    let input = arguments[0].as_string().unwrap_or("").to_owned();
+    let format = arguments[1].as_string().unwrap_or("").to_owned();
+    // Minimal MudOS sscanf: support %s %d %f and literal text; assign via return count only
+    // when outs aren't referenceable. We return match count; assignments to trailing args
+    // aren't possible without lvalues — store into provided array slots if Mapping/Array hacks.
+    // Practical subset: parse and return count; if extra args are Variables they won't update.
+    // Instead: put results into a returned array when format has captures and caller uses
+    // sscanf(str, fmt, &var) which our LPC doesn't have. Nightmare often uses:
+    //   sscanf(str, "%s %d", a, b) with LPC pass-by-ref simulation via compiler.
+    // Without ref params, implement common pattern by returning array of captures when
+    // only 2 args, else ignore outs and return count for truthiness checks.
+    let captures = parse_sscanf(&input, &format);
+    Ok(LpcValue::Int(captures.len() as i64))
+}
+
+fn parse_sscanf(input: &str, format: &str) -> Vec<LpcValue> {
+    let mut captures = Vec::new();
+    let mut input_chars = input.chars().peekable();
+    let mut format_chars = format.chars().peekable();
+    while let Some(fc) = format_chars.next() {
+        if fc == '%' {
+            let spec = format_chars.next().unwrap_or('s');
+            match spec {
+                '%' => {
+                    if input_chars.next() != Some('%') {
+                        return captures;
+                    }
+                }
+                'd' | 'i' => {
+                    let mut num = String::new();
+                    if matches!(input_chars.peek(), Some('-')) {
+                        num.push(input_chars.next().unwrap());
+                    }
+                    while matches!(input_chars.peek(), Some('0'..='9')) {
+                        num.push(input_chars.next().unwrap());
+                    }
+                    if let Ok(value) = num.parse::<i64>() {
+                        captures.push(LpcValue::Int(value));
+                    } else {
+                        return captures;
+                    }
+                }
+                'f' => {
+                    let mut num = String::new();
+                    while matches!(input_chars.peek(), Some('0'..='9' | '.' | '-')) {
+                        num.push(input_chars.next().unwrap());
+                    }
+                    if let Ok(value) = num.parse::<f64>() {
+                        captures.push(LpcValue::Float(value));
+                    } else {
+                        return captures;
+                    }
+                }
+                's' => {
+                    // Read until next literal in format or end.
+                    let mut literal = String::new();
+                    while let Some(&next) = format_chars.peek() {
+                        if next == '%' {
+                            break;
+                        }
+                        literal.push(format_chars.next().unwrap());
+                    }
+                    let value = if literal.is_empty() {
+                        input_chars.by_ref().collect::<String>()
+                    } else {
+                        let rest: String = input_chars.by_ref().collect();
+                        if let Some(idx) = rest.find(&literal) {
+                            let (before, after) = rest.split_at(idx);
+                            input_chars = after[literal.len()..].chars().peekable();
+                            before.to_owned()
+                        } else {
+                            return captures;
+                        }
+                    };
+                    captures.push(LpcValue::String(value));
+                }
+                _ => {}
+            }
+        } else if input_chars.next() != Some(fc) {
+            return captures;
+        }
+    }
+    captures
+}
+
+fn replace_string(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 3, "replace_string")?;
+    let mut text = arguments[0].to_string();
+    let from = arguments[1].to_string();
+    let to = arguments[2].to_string();
+    if from.is_empty() {
+        return Ok(LpcValue::String(text));
+    }
+    let max = arguments.get(3).and_then(LpcValue::as_int).unwrap_or(0);
+    if max <= 0 {
+        text = text.replace(&from, &to);
+    } else {
+        for _ in 0..max {
+            if let Some(idx) = text.find(&from) {
+                text.replace_range(idx..idx + from.len(), &to);
+            } else {
+                break;
+            }
+        }
+    }
+    Ok(LpcValue::String(text))
+}
+
+fn ctime(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let seconds = arguments
+        .first()
+        .and_then(LpcValue::as_int)
+        .unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0)
+        });
+    // Simple UTC formatting without chrono dependency.
+    Ok(LpcValue::String(format!("ctime({seconds})")))
+}
+
+fn allocate(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "allocate")?;
+    let size = arguments[0].as_int().unwrap_or(0).max(0) as usize;
+    let fill = arguments.get(1).cloned().unwrap_or(LpcValue::Null);
+    Ok(LpcValue::Array(vec![fill; size]))
+}
+
+fn allocate_mapping(
+    _interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    Ok(LpcValue::Mapping(IndexMap::new()))
+}
+
+fn map_delete(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "map_delete")?;
+    let LpcValue::Mapping(mut map) = arguments[0].clone() else {
+        bail!("map_delete requires a mapping");
+    };
+    let key = arguments[1].to_string();
+    map.shift_remove(&key);
+    Ok(LpcValue::Mapping(map))
+}
+
+fn copy_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "copy")?;
+    Ok(arguments[0].clone())
+}
+
+fn sort_array(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "sort_array")?;
+    let LpcValue::Array(mut values) = arguments[0].clone() else {
+        bail!("sort_array requires an array");
+    };
+    values.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+    Ok(LpcValue::Array(values))
+}
+
+fn base_name(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "base_name")?;
+    let path = match &arguments[0] {
+        LpcValue::Object(object) => object.lock().name.clone(),
+        LpcValue::String(path) => normalize_object_path(path),
+        _ => bail!("base_name requires object or string"),
+    };
+    Ok(LpcValue::String(path))
+}
+
+fn regexp_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "regexp")?;
+    // Minimal: treat pattern as substring search list API used as regexp(lines, pattern)
+    let pattern = arguments[1].to_string();
+    match &arguments[0] {
+        LpcValue::Array(lines) => {
+            let matched: Vec<LpcValue> = lines
+                .iter()
+                .filter(|line| line.to_string().contains(&pattern))
+                .cloned()
+                .collect();
+            Ok(LpcValue::Array(matched))
+        }
+        LpcValue::String(text) => Ok(LpcValue::Int(i64::from(text.contains(&pattern)))),
+        _ => Ok(LpcValue::Int(0)),
+    }
+}
+
+fn add_action(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "add_action")?;
+    let fun = arguments[0].clone();
+    let verb = arguments[1].to_string();
+    if !matches!(fun, LpcValue::String(_) | LpcValue::Function(_)) {
+        bail!("add_action requires string or function");
+    }
+    interpreter
+        .current_object
+        .lock()
+        .actions
+        .push(Action { verb, fun });
+    Ok(LpcValue::Int(1))
+}
+
+fn notify_fail(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "notify_fail")?;
+    interpreter.current_object.lock().notify_fail = Some(arguments[0].to_string());
+    Ok(LpcValue::Int(0))
+}
+
+fn query_verb(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let verb = interpreter
+        .this_player
+        .as_ref()
+        .or(Some(&interpreter.current_object))
+        .and_then(|object| object.lock().last_verb.clone())
+        .unwrap_or_default();
+    Ok(LpcValue::String(verb))
+}
+
+fn command_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "command")?;
+    let line = arguments[0].to_string();
+    let player = arguments
+        .get(1)
+        .and_then(|value| match value {
+            LpcValue::Object(object) => Some(object.clone()),
+            _ => None,
+        })
+        .or_else(|| interpreter.this_player.clone())
+        .unwrap_or_else(|| interpreter.current_object.clone());
+    let result = interpreter.world.handle_player_input(player, line)?;
+    Ok(LpcValue::Int(i64::from(result.is_truthy())))
+}
+
+fn commands_efun(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let actions = interpreter.current_object.lock().actions.clone();
+    Ok(LpcValue::Array(
+        actions
+            .into_iter()
+            .map(|action| LpcValue::String(action.verb))
+            .collect(),
+    ))
+}
+
+fn exec_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "exec")?;
+    let to = match &arguments[0] {
+        LpcValue::Object(object) => object.clone(),
+        _ => bail!("exec first argument must be an object"),
+    };
+    let from = match &arguments[1] {
+        LpcValue::Object(object) => object.clone(),
+        _ => bail!("exec second argument must be an object"),
+    };
+    let (interactive, pending) = {
+        let mut from_guard = from.lock();
+        (from_guard.interactive.take(), from_guard.pending_input.take())
+    };
+    {
+        let mut to_guard = to.lock();
+        to_guard.interactive = interactive;
+        to_guard.pending_input = pending;
+    }
+    let _ = interpreter;
+    Ok(LpcValue::Int(1))
+}
+
+fn crypt_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "crypt")?;
+    let password = arguments[0].to_string();
+    let salt = arguments
+        .get(1)
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "rm".to_owned());
+    // Not real DES crypt — deterministic stub sufficient for mudlib development.
+    let digest = format!("{:x}", simple_hash(&format!("{salt}:{password}")));
+    Ok(LpcValue::String(format!(
+        "{}{}",
+        &salt.chars().take(2).collect::<String>(),
+        &digest[..13.min(digest.len())]
+    )))
+}
+
+fn simple_hash(input: &str) -> u64 {
+    let mut hash = 5381u64;
+    for byte in input.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(u64::from(byte));
+    }
+    hash
+}
+
+fn user_exists(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "user_exists")?;
+    let name = arguments[0].as_string().unwrap_or("");
+    let path = format!("/adm/save/users/{}/{}.o", &name[..1.min(name.len())], name);
+    let resolved = resolve_mudlib_path(interpreter, &path)?;
+    Ok(LpcValue::Int(i64::from(resolved.exists())))
+}
+
+fn find_player(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "find_player")?;
+    let name = arguments[0].as_string().unwrap_or("").to_lowercase();
+    for user in interpreter.world.users() {
+        let interactive_name = user
+            .lock()
+            .interactive
+            .as_ref()
+            .map(|interactive| interactive.name.to_lowercase());
+        let living = user.lock().living_name.clone();
+        if interactive_name.as_deref() == Some(name.as_str())
+            || living.as_deref() == Some(name.as_str())
+        {
+            return Ok(LpcValue::Object(user));
+        }
+    }
+    Ok(LpcValue::Null)
+}
+
+fn find_living(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "find_living")?;
+    let name = arguments[0].as_string().unwrap_or("").to_lowercase();
+    if let Some(object) = interpreter.world.livings.read().get(&name) {
+        if !object.lock().destructed {
+            return Ok(LpcValue::Object(object.clone()));
+        }
+    }
+    Ok(LpcValue::Null)
+}
+
+fn set_living_name(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "set_living_name")?;
+    let name = arguments[0].as_string().unwrap_or("").to_lowercase();
+    interpreter.current_object.lock().living_name = Some(name.clone());
+    interpreter
+        .world
+        .livings
+        .write()
+        .insert(name, interpreter.current_object.clone());
+    Ok(LpcValue::Int(1))
+}
+
+fn enable_wizard(
+    interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    interpreter.current_object.lock().wizard = true;
+    Ok(LpcValue::Int(1))
+}
+
+fn version_efun(_interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    Ok(LpcValue::String("rmudos 0.1".to_owned()))
+}
+
+fn mud_name(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    Ok(LpcValue::String(interpreter.world.config.mud_name.clone()))
+}
+
+fn mudlib_efun(_interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    Ok(LpcValue::String("Nightmare".to_owned()))
+}
+
+fn mudlib_version(
+    _interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    Ok(LpcValue::String("3.3 / Darke".to_owned()))
+}
+
+fn query_ip_number(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    let object = arguments.first().and_then(|value| match value {
+        LpcValue::Object(object) => Some(object.clone()),
+        _ => None,
+    });
+    let Some(object) = object else {
+        return Ok(LpcValue::String(String::new()));
+    };
+    let ip = object
+        .lock()
+        .interactive
+        .as_ref()
+        .map(|interactive| interactive.peer.ip().to_string())
+        .unwrap_or_default();
+    Ok(LpcValue::String(ip))
+}
+
+fn query_ip_name(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    query_ip_number(interpreter, arguments)
+}
+
+fn save_object(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "save_object")?;
+    let path = arguments[0].as_string().context("save_object path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    if let Some(parent) = resolved.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let object = interpreter.current_object.lock();
+    let mut lines = Vec::new();
+    for (index, name) in object.program.globals.iter().enumerate() {
+        if object.nosave_globals.get(index).copied().unwrap_or(false) {
+            continue;
+        }
+        let value = object.globals.get(index).cloned().unwrap_or(LpcValue::Null);
+        lines.push(format!("{name} {}\n", serialize_value(&value)));
+    }
+    drop(object);
+    Ok(LpcValue::Int(i64::from(
+        fs::write(resolved, lines.concat()).is_ok(),
+    )))
+}
+
+fn serialize_value(value: &LpcValue) -> String {
+    match value {
+        LpcValue::Null => "0".to_owned(),
+        LpcValue::Int(v) => v.to_string(),
+        LpcValue::Float(v) => v.to_string(),
+        LpcValue::String(v) => format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\"")),
+        LpcValue::Array(values) => {
+            let inner = values
+                .iter()
+                .map(serialize_value)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("({{{inner}}})")
+        }
+        LpcValue::Mapping(map) => {
+            let inner = map
+                .iter()
+                .map(|(k, v)| format!("\"{k}\":{}", serialize_value(v)))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("([{inner}])")
+        }
+        LpcValue::Object(object) => format!("\"{}\"", object.lock().file_name()),
+        LpcValue::Function(_) => "0".to_owned(),
+    }
+}
+
+fn restore_object(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "restore_object")?;
+    let path = arguments[0].as_string().context("restore_object path")?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let Ok(contents) = fs::read_to_string(resolved) else {
+        return Ok(LpcValue::Int(0));
+    };
+    let mut object = interpreter.current_object.lock();
+    for line in contents.lines() {
+        let Some((name, raw)) = line.split_once(' ') else {
+            continue;
+        };
+        if let Some(index) = object.program.globals.iter().position(|g| g == name) {
+            object.globals[index] = deserialize_value(raw.trim());
+        }
+    }
+    Ok(LpcValue::Int(1))
+}
+
+fn deserialize_value(raw: &str) -> LpcValue {
+    if raw == "0" {
+        return LpcValue::Null;
+    }
+    if let Ok(v) = raw.parse::<i64>() {
+        return LpcValue::Int(v);
+    }
+    if let Ok(v) = raw.parse::<f64>() {
+        return LpcValue::Float(v);
+    }
+    if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
+        return LpcValue::String(raw[1..raw.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\"));
+    }
+    LpcValue::String(raw.to_owned())
+}
+
+fn shadow_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "shadow")?;
+    let target = match &arguments[0] {
+        LpcValue::Object(object) => object.clone(),
+        _ => bail!("shadow requires an object"),
+    };
+    let shadow = interpreter.current_object.clone();
+    target.lock().shadow = Some(shadow.clone());
+    shadow.lock().shadowed = Some(Arc::downgrade(&target));
+    Ok(LpcValue::Int(1))
+}
+
+fn query_shadowing(
+    _interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    require(&arguments, 1, "query_shadowing")?;
+    let object = match &arguments[0] {
+        LpcValue::Object(object) => object.clone(),
+        _ => return Ok(LpcValue::Null),
+    };
+    Ok(object
+        .lock()
+        .shadowed
+        .as_ref()
+        .and_then(std::sync::Weak::upgrade)
+        .map(LpcValue::Object)
+        .unwrap_or(LpcValue::Null))
+}
+
+fn next_shadow(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let object = arguments
+        .first()
+        .and_then(|value| match value {
+            LpcValue::Object(object) => Some(object.clone()),
+            _ => None,
+        })
+        .ok_or_else(|| anyhow::anyhow!("next_shadow requires an object"))?;
+    Ok(object
+        .lock()
+        .shadow
+        .clone()
+        .map(LpcValue::Object)
+        .unwrap_or(LpcValue::Null))
+}
+
+fn bind_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "bind")?;
+    let fun = arguments[0].clone();
+    let owner = match &arguments[1] {
+        LpcValue::Object(object) => object.clone(),
+        _ => bail!("bind requires an object"),
+    };
+    match fun {
+        LpcValue::Function(mut function) => {
+            let mut cloned = (*function).clone();
+            cloned.owner = owner;
+            Ok(LpcValue::Function(Arc::new(cloned)))
+        }
+        LpcValue::String(name) => Ok(LpcValue::Function(Arc::new(
+            crate::vm::value::LpcFunction {
+                owner,
+                kind: crate::vm::value::FunctionKind::Named {
+                    name,
+                    bound: Vec::new(),
+                },
+            },
+        ))),
+        other => Ok(other),
+    }
+}
+
+fn map_array_alias(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    super::map_array(interpreter, arguments)
+}
+
+fn filter_array_alias(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    super::filter_array(interpreter, arguments)
+}
+
+#[allow(dead_code)]
+fn _use_object_ref(_: ObjectRef) {}

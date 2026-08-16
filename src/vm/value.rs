@@ -1,6 +1,48 @@
 use super::object::ObjectRef;
+use super::program::FunctionInfo;
 use indexmap::IndexMap;
+use parking_lot::Mutex;
 use std::fmt;
+use std::sync::Arc;
+
+/// First-class MudOS-style function value (`(: … :)`).
+#[derive(Clone, Debug)]
+pub struct LpcFunction {
+    pub owner: ObjectRef,
+    pub kind: FunctionKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum FunctionKind {
+    /// `(: name :)` / `(: name, bound... :)` — object apply or efun.
+    Named { name: String, bound: Vec<LpcValue> },
+    /// `(: expression :)` compiled anonymous body.
+    Expression { function: Arc<FunctionInfo> },
+}
+
+/// Compile-time class (struct) definition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClassDef {
+    pub name: String,
+    pub fields: Vec<String>,
+}
+
+/// Runtime class instance (shared reference semantics).
+#[derive(Debug)]
+pub struct ClassInstance {
+    pub def: Arc<ClassDef>,
+    pub fields: Mutex<Vec<LpcValue>>,
+}
+
+impl ClassInstance {
+    pub fn new(def: Arc<ClassDef>) -> Arc<Self> {
+        let fields = vec![LpcValue::Null; def.fields.len()];
+        Arc::new(Self {
+            def,
+            fields: Mutex::new(fields),
+        })
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum LpcValue {
@@ -11,6 +53,8 @@ pub enum LpcValue {
     Array(Vec<LpcValue>),
     Mapping(IndexMap<String, LpcValue>),
     Object(ObjectRef),
+    Function(Arc<LpcFunction>),
+    Class(Arc<ClassInstance>),
 }
 
 impl LpcValue {
@@ -23,6 +67,8 @@ impl LpcValue {
             Self::Array(value) => !value.is_empty(),
             Self::Mapping(value) => !value.is_empty(),
             Self::Object(object) => !object.lock().destructed,
+            Self::Function(_) => true,
+            Self::Class(_) => true,
         }
     }
 
@@ -59,6 +105,8 @@ impl LpcValue {
             Self::Array(_) => "array",
             Self::Mapping(_) => "mapping",
             Self::Object(_) => "object",
+            Self::Function(_) => "function",
+            Self::Class(_) => "class",
         }
     }
 
@@ -85,6 +133,28 @@ impl LpcValue {
                     .join(", ")
             ),
             Self::Object(object) => format!("<{}>", object.lock().name),
+            Self::Function(function) => match &function.kind {
+                FunctionKind::Named { name, bound } => {
+                    if bound.is_empty() {
+                        format!("(: {name} :)")
+                    } else {
+                        format!("(: {name}, ... :)")
+                    }
+                }
+                FunctionKind::Expression { .. } => "(: <expr> :)".to_owned(),
+            },
+            Self::Class(instance) => {
+                let fields = instance.fields.lock();
+                format!(
+                    "(#\"{}\",{})",
+                    instance.def.name,
+                    fields
+                        .iter()
+                        .map(Self::lpc_repr)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
         }
     }
 }
@@ -113,6 +183,8 @@ impl PartialEq for LpcValue {
                     left.lock().id == right.lock().id
                 }
             }
+            (Self::Function(left), Self::Function(right)) => Arc::ptr_eq(left, right),
+            (Self::Class(left), Self::Class(right)) => Arc::ptr_eq(left, right),
             _ => false,
         }
     }
@@ -143,9 +215,11 @@ impl fmt::Display for LpcValue {
             Self::Int(value) => write!(formatter, "{value}"),
             Self::Float(value) => write!(formatter, "{value}"),
             Self::String(value) => formatter.write_str(value),
-            Self::Array(_) | Self::Mapping(_) | Self::Object(_) => {
-                formatter.write_str(&self.lpc_repr())
-            }
+            Self::Array(_)
+            | Self::Mapping(_)
+            | Self::Object(_)
+            | Self::Function(_)
+            | Self::Class(_) => formatter.write_str(&self.lpc_repr()),
         }
     }
 }

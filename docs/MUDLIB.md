@@ -10,11 +10,16 @@ This guide walks through the bundled mudlib, then shows how to create your own.
 
 ```
 mudlib/                 ← filesystem root (config `mudlib`)
-  secure/master.c       ← object path /secure/master
-  std/room.c            ← /std/room  (blueprint)
-  std/user.c            ← /std/user  (cloned per player)
-  room/void.c           ← /room/void (loaded once)
+  secure/master.c       ← stub master (current config.toml)
+  secure/login.c        ← stub login with write + input_to
+  adm/obj/master.c      ← full Nightmare master (future `master =`)
+  adm/obj/login.c       ← full login → exec onto /std/user
+  std/room.c            ← /std/room  (Nightmare room)
+  std/user.c            ← /std/user  (cloned after login)
+  room/void.c           ← /room/void (sample world)
 ```
+
+The driver boots with MudOS-style `epilog` → `preload(path)` when present; `/secure/master` still uses a void `preload()` that loads sample rooms. Point `config.toml` at `/adm/obj/master` once that object and its preload daemons compile under the expanded efun set.
 
 Rules of thumb:
 

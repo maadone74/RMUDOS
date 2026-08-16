@@ -6,6 +6,8 @@ pub enum TokenKind {
     Number(i64),
     Float(f64),
     String(String),
+    /// MudOS functional argument placeholder (`$1`, `$2`, …).
+    DollarArg(usize),
     Symbol(String),
     Eof,
 }
@@ -60,6 +62,10 @@ impl<'a> Lexer<'a> {
                 self.number()?
             } else if ch == '"' {
                 self.string()?
+            } else if ch == '\'' {
+                self.char_literal()?
+            } else if ch == '$' {
+                self.dollar_arg()?
             } else {
                 self.symbol()?
             };
@@ -167,10 +173,75 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn char_literal(&mut self) -> Result<TokenKind> {
+        let line = self.line;
+        let column = self.column;
+        self.advance(); // opening '
+        let ch = match self.advance() {
+            Some('\\') => match self.advance() {
+                Some('n') => '\n',
+                Some('r') => '\r',
+                Some('t') => '\t',
+                Some('\\') => '\\',
+                Some('\'') => '\'',
+                Some('0') => '\0',
+                Some(other) => other,
+                None => bail!("line {line}, column {column}: unterminated character literal"),
+            },
+            Some('\'') => bail!("line {line}, column {column}: empty character literal"),
+            Some(ch) => ch,
+            None => bail!("line {line}, column {column}: unterminated character literal"),
+        };
+        if self.advance() != Some('\'') {
+            bail!("line {line}, column {column}: unterminated character literal");
+        }
+        Ok(TokenKind::Number(ch as i64))
+    }
+
+    fn dollar_arg(&mut self) -> Result<TokenKind> {
+        let column = self.column;
+        self.advance(); // '$'
+        if !self.peek(0).is_some_and(|ch| ch.is_ascii_digit()) {
+            bail!(
+                "line {}, column {}: expected digits after '$'",
+                self.line,
+                column
+            );
+        }
+        let start = self.offset;
+        while self.peek(0).is_some_and(|ch| ch.is_ascii_digit()) {
+            self.advance();
+        }
+        let text: String = self.chars[start..self.offset].iter().collect();
+        let index: usize = match text.parse() {
+            Ok(value) => value,
+            Err(_) => bail!("line {}: invalid functional argument ${text}", self.line),
+        };
+        if index == 0 {
+            bail!("line {}: functional arguments are 1-based ($1, $2, …)", self.line);
+        }
+        Ok(TokenKind::DollarArg(index))
+    }
+
     fn symbol(&mut self) -> Result<TokenKind> {
-        const DOUBLE: [&str; 13] = [
-            "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "->", "..", "::",
+        const DOUBLE: [&str; 17] = [
+            "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "|=", "&=", "->", "..", "::",
+            "++", "--",
         ];
+        // `(:` / `:)` for functionals — but `(::` is `(` + `::`, not `(:` + `:`.
+        if self.peek(0) == Some('(')
+            && self.peek(1) == Some(':')
+            && self.peek(2) != Some(':')
+        {
+            self.advance();
+            self.advance();
+            return Ok(TokenKind::Symbol("(:".to_owned()));
+        }
+        if self.peek(0) == Some(':') && self.peek(1) == Some(')') {
+            self.advance();
+            self.advance();
+            return Ok(TokenKind::Symbol(":)".to_owned()));
+        }
         let pair = match (self.peek(0), self.peek(1)) {
             (Some(a), Some(b)) => Some(format!("{a}{b}")),
             _ => None,
@@ -183,7 +254,7 @@ impl<'a> Lexer<'a> {
         let Some(ch) = self.advance() else {
             bail!("unexpected end of source");
         };
-        if "{}()[];,:.+-*/%!<>=?".contains(ch) {
+        if "{}()[];,:.+-*/%!<>=?|&^~".contains(ch) {
             Ok(TokenKind::Symbol(ch.to_string()))
         } else {
             bail!(

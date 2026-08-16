@@ -55,7 +55,7 @@ Array literals `({ ... })` are rewritten toward `[ ... ]` before parse for gramm
 - Interactive attachment happens **before** `logon()` so welcome text can flush.
 - On `process_input` → `0`, interactive is cleared and the object is destructed.
 
-Heartbeats run on a separate 2s interval task over all objects defining `heart_beat`.
+Heartbeats run on a separate 2s interval task over objects with `set_heart_beat` enabled. The same tick processes due `call_out` entries; every ~60s a coarse `reset()` sweep runs.
 
 ---
 
@@ -66,12 +66,15 @@ Intentional similarities: master object, applies, load/clone, efun names, mudlib
 Intentional differences / current gaps:
 
 - Clean-room Rust, not a C++ port
-- Small curated efun set
-- No simul_efun, UID/privileges, or `valid_read`/`valid_write`
-- No LPC preprocessor
-- No disk persistence efuns yet
-- `catch_tell` not wired through driver write paths
+- Growing MudOS efun set (filesystem sandbox, commands, login helpers)
+- simul_efun object not yet auto-loaded
+- Preprocessor is real but `#if` / function-like macros are limited
+- `catch_tell` not specially wired beyond interactive `write`
 - Config is a simple key=value file, not MudOS `config.h` macros
+
+Boot: prefer master `epilog(0)` → preload each path; if `epilog` is absent, call void `preload()` (used by `/secure/master`).
+
+`config.toml` may set `master = "/adm/obj/master"` and `simul_efun = "/adm/obj/simul_efun"`. Simul_efun is loaded before master; unknown efun names fall through to that object. Keep `/secure/*` as a lightweight regression harness (default in unit tests).
 
 When reviewing gameplay bugs, check the mudlib first. When reviewing language/runtime bugs, start at `compiler/` and `vm/interpret.rs`.
 

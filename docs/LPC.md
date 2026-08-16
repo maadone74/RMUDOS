@@ -36,7 +36,7 @@ void create() {
 | `object` | Live object reference |
 | `mapping` | String-keyed map |
 | `mixed` | Any value |
-| `function` | Accepted as a type name; no first-class function values yet |
+| `function` | First-class values from MudOS functionals (`(: … :)`) |
 
 Falsy values: `0` / null, integer `0`, float `0.0`, empty string, empty array, empty mapping, destructed object.
 
@@ -66,9 +66,14 @@ Modifiers parsed but not fully enforced as a security model: `public`, `private`
 | `123`, `-1` | Integer |
 | `1.5` | Float |
 | `"text"` | String (escapes supported in lexer) |
+| `'/'`, `'\n'` | Character → integer code point |
 | `({ 1, 2, 3 })` | Array (also rewritten from `({` / `})`) |
 | `([ ])` / `([])` | Empty mapping |
 | `([ "a": 1, "b": 2 ])` | Mapping (keys are strings) |
+| `(: name :)` / `(: name, args... :)` | Named functional (object apply or efun) |
+| `(: $1 + $2 :)` | Expression functional (`$1`…`$n` are arguments) |
+
+Use with `evaluate(fun, …)`, `filter_array`, and `map_array`.
 
 ---
 
@@ -84,10 +89,11 @@ Supported in broad strokes:
 - Slices: expression form exists in the compiler
 - Calls: `fn(args)`, `obj->method(args)` (desugars to `call_other`)
 - `this_object()` — current object (compiler intrinsic)
-- Control: `if` / `else`, `while`, `return`, block `{ ... }`
+- Control: `if` / `else`, `while`, `for`, `foreach`, `switch` / `case` / `break` / `continue`, `return`, block `{ ... }`
 - Ternary: `cond ? a : b`
+- Error capture: `catch(expr)` returns `0` on success or an error string on failure; `throw(value)` raises
 
-Not a full FluffOS/MudOS grammar: expect gaps around closures, structs, comprehensive `foreach`, `#include` / `#define` preprocessor, and many package efuns.
+Includes MudOS functionals (`(: … :)` / `$n`), bitwise ops, casts, and a preprocessor (`#include`, `#define`, `#ifdef` / `#ifndef` / `#if` / `#else` / `#endif`). Remaining gaps: full function-like macros, rich `#if` expressions, and LPC `class`.
 
 ---
 
@@ -146,12 +152,13 @@ Errors report parse/codegen context with the object path. Fix the LPC file and r
 | Feature | rmudos today |
 | --- | --- |
 | Core objects / inherits | Yes |
-| Mapping / array / string ops | Partial (see efuns) |
-| simul_efun | No |
-| `#include` / macros | No |
-| Privileges / `valid_*` | No |
-| save_object / restore_object | No |
-| Full FluffOS packages | No — curated efun table only |
-| `catch` / error handling LPC | Limited / not MudOS-complete |
+| Mapping / array / string ops | Broad MudOS subset (see efuns) |
+| `foreach` / `catch` / `throw` | Yes |
+| simul_efun | Not loaded yet (config hook optional later) |
+| `#include` / `#define` / `#ifdef` | Yes (limited `#if`; function macros incomplete) |
+| Privileges / `valid_*` | Partial (`seteuid` soft-calls master) |
+| save_object / restore_object | Yes (simple `.o` text format) |
+| `call_out` / `add_action` / `exec` | Yes |
+| Full FluffOS packages | No — curated efun table |
 
-Write mudlibs to this subset; porting a large FluffOS lib will require trimming and efun shims.
+Write mudlibs toward MudOS 0.9-era semantics; large Nightmare trees still hit missing efuns and richer preprocessor edge cases.

@@ -111,4 +111,15 @@ To add a built-in:
 3. Document it here.
 4. Prefer mudlib-level helpers when possible.
 
-There is currently **no** simul_efun layer and **no** package loading system.
+There is currently **no** package loading system. A large MudOS-oriented efun set lives in `src/efun/mod.rs` and `src/efun/mudos_extra.rs` (filesystem, `call_out`, `add_action`, `exec`, `save_object`, shadows, etc.).
+
+### Notable additions
+
+| Area | Efuns |
+| --- | --- |
+| Timers | `call_out`, `remove_call_out`, `find_call_out` |
+| Files | `read_file`, `write_file`, `file_size`, `file_exists`, `log_file`, `get_dir`, `mkdir`, `rm`, `cp`, `rename` |
+| Commands | `add_action`, `notify_fail`, `query_verb`, `command`, `commands` |
+| Login | `exec`, `crypt`, `user_exists`, `query_ip_number`, `find_player`, `find_living`, `set_living_name` |
+| Persist | `save_object`, `restore_object` |
+| Misc | `sscanf` (out-param assignment), `replace_string`, `ctime`, `present`, `deep_inventory`, `shadow`, `receive`, `error`, `function_exists`, `export_uid`, `save_variable`, `restore_variable` |

@@ -1,0 +1,55 @@
+---
+description: Strict guidelines for writing LPC (Lars Pensjö C) for MUDs, enforcing FluffOS/LDMud standards and preventing standard C leakage.
+globs: ["*.c", "*.h", "*.lpc"]
+alwaysApply: true
+---
+# LPC (Lars Pensjö C) Development Rules
+
+You are an expert in LPC (Lars Pensjö C), the object-oriented, C-like language used to build LPMud game worlds (specifically FluffOS, LDMud, and MudOS). 
+
+When editing files in this project, you must strictly follow LPC syntax and paradigms. **Do NOT write standard C or C++.** There are fundamental engine differences you must respect to ensure the driver compiles the code.
+
+## 🚨 Core Language Anti-Patterns (NEVER DO THESE)
+- **No Standard C Libraries**: Never use `#include <stdio.h>`, `<stdlib.h>`, etc.
+- **No Manual Memory Management**: LPC is garbage collected. NEVER use `malloc`, `calloc`, `free`, `new`, or `delete`.
+- **No Memory Pointers**: LPC does not have explicit pointers (no `*var` or `&var` for memory addresses). 
+- **No `main()` Function**: LPC is event-driven. Execution begins through driver applies like `create()` or `init()`.
+- **No C++ Classes**: Do not use `class X {}`. Use LPC's inheritance.
+
+## 1. Types and Data Structures
+- **Valid types**: `int`, `float`, `string`, `object`, `mapping`, `mixed`. 
+- **Arrays**: Denoted by appending `*` to the type (e.g., `object *obs`, `int *numbers`, `mixed *`). Array literals use `({ 1, 2, 3 })`.
+- **Mappings**: Hash maps/dictionaries. Denoted as `mapping`. Literals use `([ "key": "value", "key2": 2 ])`.
+- **Mixed**: Use `mixed` for variables that can hold any type, but prefer strict typing when possible.
+
+## 2. Objects and Inheritance
+- Everything is an object. A `.c` file is an object blueprint.
+- **Inheritance Syntax**: Use `inherit "/path/to/file";` at the top of the file below includes.
+- **Instantiation**: Use `clone_object("/path/to/file")` to create a new instance of an object.
+- **Self Reference**: Use `this_object()` instead of `this`.
+- **Contextual References**: 
+  - `this_player()`: The user triggering the current action.
+  - `environment(this_object())`: The room or container holding the current object.
+
+## 3. Built-in Functions (Efuns)
+Rely strictly on standard efuns provided by the FluffOS/MudOS driver.
+- **I/O**: `write()`, `tell_object()`, `tell_room()`, `say()`. (Do not use `printf` unless explicitly required by the mudlib, use `write`).
+- **Timers**: `call_out("function_name", delay_in_seconds, args...)`. NEVER use `sleep()`.
+- **Inventory/State**: `present()`, `move_object()`, `destruct()`.
+- **Action Handling**: `query_name()`, `query_verb()`, `notify_fail()`, `add_action()`.
+
+## 4. Driver Applies (Standard Callbacks)
+Implement these standard functions for object lifecycle:
+- `void create()`: Called once when the object is created/cloned. Initialize state, variables, and descriptions here.
+- `void reset()`: Called periodically to reset the object state (e.g., respawning monsters/items).
+- `void init()`: Called when a living object enters the same environment. Used to bind local commands via `add_action()`.
+- `void heart_beat()`: Called every server tick if `set_heart_beat(1)` is active.
+
+## 5. LPCDoc Formatting
+When adding documentation, use JSDoc-style comments (supported by modern LPC Language Servers):
+```c
+/**
+ * Short description of the lfun.
+ * @param {object} target - The target of the action
+ * @returns {int} 1 for success, 0 for failure
+ */

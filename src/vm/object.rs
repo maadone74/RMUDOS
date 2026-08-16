@@ -1,5 +1,6 @@
 use super::program::Program;
 use super::value::LpcValue;
+use crate::net::TelnetOut;
 use parking_lot::Mutex;
 use std::net::SocketAddr;
 use std::sync::{Arc, Weak};
@@ -12,14 +13,14 @@ pub type ObjectRef = Arc<Mutex<Object>>;
 pub struct Interactive {
     pub peer: SocketAddr,
     pub name: String,
-    output: mpsc::UnboundedSender<String>,
+    output: mpsc::UnboundedSender<TelnetOut>,
 }
 
 impl Interactive {
     pub fn new(
         peer: SocketAddr,
         name: impl Into<String>,
-        output: mpsc::UnboundedSender<String>,
+        output: mpsc::UnboundedSender<TelnetOut>,
     ) -> Self {
         Self {
             peer,
@@ -29,8 +30,28 @@ impl Interactive {
     }
 
     pub fn write(&self, message: impl Into<String>) -> bool {
-        self.output.send(message.into()).is_ok()
+        self.output.send(TelnetOut::Text(message.into())).is_ok()
     }
+
+    pub fn set_echo(&self, enable: bool) -> bool {
+        self.output.send(TelnetOut::Echo(enable)).is_ok()
+    }
+}
+
+/// Next line of input diverted by `input_to`.
+#[derive(Clone, Debug)]
+pub struct PendingInput {
+    pub fun: LpcValue,
+    pub extra: Vec<LpcValue>,
+    pub no_echo: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Action {
+    pub verb: String,
+    pub fun: LpcValue,
+    /// MudOS flag: empty verb with flag treats this as a catch-all command.
+    pub catch_all: bool,
 }
 
 #[derive(Debug)]
@@ -44,14 +65,35 @@ pub struct Object {
     pub interactive: Option<Arc<Interactive>>,
     pub destructed: bool,
     pub clone_number: Option<u64>,
+    /// Non-zero when `set_heart_beat` has enabled heartbeats (MudOS semantics).
+    pub heart_beat: i32,
+    pub pending_input: Option<PendingInput>,
+    pub actions: Vec<Action>,
+    pub notify_fail: Option<String>,
+    pub last_verb: Option<String>,
+    pub commands_enabled: bool,
+    pub uid: String,
+    pub euid: String,
+    pub wizard: bool,
+    pub living_name: Option<String>,
+    pub shadow: Option<ObjectRef>,
+    pub shadowed: Option<Weak<Mutex<Object>>>,
+    pub reset_count: u64,
+    pub nosave_globals: Vec<bool>,
 }
 
 impl Object {
     pub fn new(id: ObjectId, name: String, program: Arc<Program>) -> Self {
         let global_count = program.globals.len();
+        let nosave_globals = if program.nosave_globals.len() == global_count {
+            program.nosave_globals.clone()
+        } else {
+            vec![false; global_count]
+        };
+        let uid = name.clone();
         Self {
             id,
-            name,
+            name: name.clone(),
             program,
             globals: vec![LpcValue::Null; global_count],
             environment: None,
@@ -59,6 +101,20 @@ impl Object {
             interactive: None,
             destructed: false,
             clone_number: None,
+            heart_beat: 0,
+            pending_input: None,
+            actions: Vec::new(),
+            notify_fail: None,
+            last_verb: None,
+            commands_enabled: false,
+            uid: uid.clone(),
+            euid: uid,
+            wizard: false,
+            living_name: None,
+            shadow: None,
+            shadowed: None,
+            reset_count: 0,
+            nosave_globals,
         }
     }
 
@@ -77,5 +133,11 @@ impl Object {
         self.interactive
             .as_ref()
             .is_some_and(|interactive| interactive.write(message))
+    }
+
+    pub fn set_echo(&self, enable: bool) -> bool {
+        self.interactive
+            .as_ref()
+            .is_some_and(|interactive| interactive.set_echo(enable))
     }
 }

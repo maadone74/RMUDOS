@@ -12,7 +12,7 @@ void preload() {
 }
 
 object connect() {
-    object user;
-    user = clone_object("/std/user");
-    return user;
+    object login;
+    login = clone_object("/secure/login");
+    return login;
 }

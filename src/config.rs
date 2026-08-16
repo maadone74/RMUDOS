@@ -9,6 +9,7 @@ pub struct DriverConfig {
     pub port: u16,
     pub mudlib: PathBuf,
     pub master: String,
+    pub simul_efun: Option<String>,
     pub max_cost: usize,
 }
 
@@ -20,6 +21,7 @@ impl Default for DriverConfig {
             port: 4000,
             mudlib: PathBuf::from("mudlib"),
             master: "/secure/master".to_owned(),
+            simul_efun: None,
             max_cost: 1_000_000,
         }
     }
@@ -62,6 +64,13 @@ impl DriverConfig {
                 }
                 "mudlib" => config.mudlib = PathBuf::from(value),
                 "master" => config.master = normalize_object_path(&value),
+                "simul_efun" => {
+                    config.simul_efun = if value.is_empty() {
+                        None
+                    } else {
+                        Some(normalize_object_path(&value))
+                    }
+                }
                 "max_cost" => {
                     config.max_cost = value.parse().with_context(|| {
                         format!("configuration line {line_number}: invalid max_cost")

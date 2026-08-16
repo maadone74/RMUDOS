@@ -2,5 +2,6 @@ mud_name = "RustMud"
 bind = "0.0.0.0"
 port = 4000
 mudlib = "mudlib"
-master = "/secure/master"
+master = "/adm/obj/master"
+simul_efun = "/adm/obj/simul_efun"
 max_cost = 1000000

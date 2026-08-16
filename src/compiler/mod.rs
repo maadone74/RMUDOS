@@ -2,6 +2,7 @@ pub mod ast;
 pub mod codegen;
 pub mod lexer;
 pub mod parser;
+pub mod preprocess;
 
 use crate::config::normalize_object_path;
 use crate::vm::program::Program;
@@ -60,6 +61,8 @@ fn compile_recursive(
     let file_path = object_file(root, object_path)?;
     let source = fs::read_to_string(&file_path)
         .with_context(|| format!("failed to read LPC object {}", file_path.display()))?;
+    let source = preprocess::preprocess(&source, &file_path, root)
+        .with_context(|| format!("while preprocessing {object_path}"))?;
     let ast = parser::parse(&source).with_context(|| format!("while parsing {object_path}"))?;
     let mut inherited = Vec::new();
     for inherit in &ast.inherits {
