@@ -1,0 +1,17 @@
+---
+description: LPC for the Nightmare/Darke mudlib (not C)
+globs: RMUDOS/mudlib/**/*.{c,h}
+alwaysApply: false
+---
+
+# LPC mudlib
+
+Write LPC, not C. No `stdio.h`, `malloc`, pointers, `main()`, or C++ classes.
+
+- Types: `int`, `float`, `string`, `object`, `mapping`, `mixed`, `function`. Arrays `object *`; literals `({ })` and `([ "k": v ])`.
+- Lifecycle: `create()`, `reset()`, `init()` (`add_action` here), `heart_beat()`.
+- Actions return `1` if handled, `0` to fall through. Use `notify_fail()` on fail.
+- `this_object()`, `this_player()`, `previous_object()`. Instantiation: `clone_object` / `new`.
+- Do not add `get_dir`/`rehash` on unknown verbs. Skip `SOUL_D`/`CHAT_D`/`BBOARD_D` on first enter if they touch many files.
+- `cmd_hook` must not call `CMD_D` during `"in creation"`. Wrap risky `call_other` in `catch`.
+- Casts like `(string)0` print `0`; use `stringp()` before concatenating.

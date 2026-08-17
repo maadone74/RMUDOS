@@ -84,6 +84,44 @@ impl FunctionInfo {
     }
 }
 
+/// Rewrite `LoadGlobal`/`StoreGlobal` indices from one program layout to another.
+/// Used when merging inherits and when `inherit::fun()` runs on a child object.
+pub fn relocate_function(function: &FunctionInfo, relocation: &[usize]) -> FunctionInfo {
+    let mut function = function.clone();
+    for operation in &mut function.code {
+        match operation {
+            Op::LoadGlobal(index) | Op::StoreGlobal(index) => {
+                *index = relocation[*index];
+            }
+            Op::MakeExprFunction(inner) => {
+                *inner = Arc::new(relocate_function(inner, relocation));
+            }
+            _ => {}
+        }
+    }
+    function
+}
+
+pub fn relocate_function_to_globals(
+    function: &FunctionInfo,
+    from_globals: &[String],
+    to_globals: &[String],
+) -> Result<FunctionInfo, String> {
+    let mut relocation = Vec::with_capacity(from_globals.len());
+    for name in from_globals {
+        match to_globals.iter().position(|candidate| candidate == name) {
+            Some(index) => relocation.push(index),
+            None => {
+                return Err(format!(
+                    "inherited global {name} missing in object (from {})",
+                    function.defining_path
+                ));
+            }
+        }
+    }
+    Ok(relocate_function(function, &relocation))
+}
+
 #[derive(Clone, Debug)]
 pub struct Program {
     pub path: String,

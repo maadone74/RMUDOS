@@ -914,7 +914,11 @@ fn command_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> 
 }
 
 fn commands_efun(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
-    let actions = interpreter.current_object.lock().actions.clone();
+    let target = interpreter
+        .this_player
+        .clone()
+        .unwrap_or_else(|| interpreter.current_object.clone());
+    let actions = target.lock().actions.clone();
     Ok(LpcValue::Array(
         actions
             .into_iter()

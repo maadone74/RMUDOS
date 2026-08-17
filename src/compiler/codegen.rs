@@ -2,7 +2,7 @@ use super::ast::{
     BinaryOp, CaseLabel, Expr, FunctionDecl, PostfixOp, ProgramAst, Stmt, UnaryOp,
 };
 use super::parser::is_lvalue;
-use crate::vm::program::{FunctionInfo, Op, Program};
+use crate::vm::program::{relocate_function, FunctionInfo, Op, Program};
 use crate::vm::value::{ClassDef, LpcValue};
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
@@ -170,22 +170,6 @@ pub fn inherit_fn_names(inherited: &[Arc<Program>], ast: &ProgramAst) -> HashSet
     }
     names.extend(ast.functions.iter().map(|function| function.name.clone()));
     names
-}
-
-fn relocate_function(function: &FunctionInfo, relocation: &[usize]) -> FunctionInfo {
-    let mut function = function.clone();
-    for operation in &mut function.code {
-        match operation {
-            Op::LoadGlobal(index) | Op::StoreGlobal(index) => {
-                *index = relocation[*index];
-            }
-            Op::MakeExprFunction(inner) => {
-                *inner = Arc::new(relocate_function(inner, relocation));
-            }
-            _ => {}
-        }
-    }
-    function
 }
 
 struct FunctionCompiler<'a> {

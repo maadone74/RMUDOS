@@ -193,9 +193,15 @@ void describe_current_room(int verbose) {
 	message("listen", (string)((*tmp)("default")), this_object());
     if(verbose && (tmp=(string)env->query_long_exits()) && tmp != "")
 	message("room_exits", sprintf("\n%s\n", tmp), this_object());
-    if((tmp=(string)env->describe_living_contents(({this_object()})))!="")
+    tmp = 0;
+    if(catch(tmp = env->describe_living_contents(({this_object()}))))
+	tmp = 0;
+    if(stringp(tmp) && tmp != "")
 	message("living_item", tmp, this_object());
-    if((tmp=(string)env->describe_item_contents(({})))!="")
+    tmp = 0;
+    if(catch(tmp = env->describe_item_contents(({}))))
+	tmp = 0;
+    if(stringp(tmp) && tmp != "")
 	message("inanimate_item", tmp, this_object());
 }
 

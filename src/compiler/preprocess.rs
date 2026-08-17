@@ -161,10 +161,16 @@ impl Preprocessor {
         let resolved = if system || path.starts_with('/') {
             self.resolve_system_include(&path)?
         } else {
-            from_file
+            let relative = from_file
                 .parent()
                 .unwrap_or_else(|| Path::new("."))
-                .join(&path)
+                .join(&path);
+            if relative.is_file() {
+                relative
+            } else {
+                // MudOS: "foo.h" also searches the include path.
+                self.resolve_system_include(&path)?
+            }
         };
 
         let source = fs::read_to_string(&resolved)

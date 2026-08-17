@@ -1,0 +1,14 @@
+---
+description: What RMUDOS is and where code lives
+alwaysApply: true
+---
+
+# RMUDOS project map
+
+Crate root is `RMUDOS/` (Cargo.toml, `src/`, `mudlib/`). Docs are `RMUDOS/docs/`.
+
+- **Driver** (Rust): MudOS-compatible LPC compiler + VM + telnet. Clean-room, not a C++ port.
+- **Mudlib**: Nightmare/Darke LPC under `RMUDOS/mudlib/`. Prefer driver fixes for wrong efun/apply semantics; patch mudlib only for lib bugs or OneDrive-safe workarounds.
+- Goal: playable telnet new-character flow → race/stats → Newbieville movement.
+
+Do not invent C/C++ MudOS internals. Match documented MudOS LPC behavior. Never add `get_dir`/`file_size` on hot command paths without a cache — this tree often lives on OneDrive and those calls hang the session.

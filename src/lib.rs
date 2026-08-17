@@ -657,6 +657,63 @@ void create() { enable_commands(); }
     }
 
     #[test]
+    fn eval_lock_serializes_heartbeat_and_player_input() {
+        let player_prog = compiler::compile_source(
+            r#"
+int ticks;
+void create() { enable_commands(); set_heart_beat(1); }
+void heart_beat() { ticks++; }
+int cmd_look(string arg) {
+    write("LOOK:" + ticks + "\n");
+    return 1;
+}
+void init() { add_action("cmd_look", "look"); }
+"#,
+            "/test/eval_player",
+        )
+        .expect("compile player");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = std::sync::Arc::new(MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        }));
+        let player_id = world.allocate_object_id();
+        let player = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            player_id,
+            "/test/eval_player".to_owned(),
+            std::sync::Arc::new(player_prog),
+        )));
+        world.objects.write().insert(player_id, player.clone());
+        let _ = world.apply(player.clone(), "create", Vec::new(), None, None);
+        let _ = world.apply(player.clone(), "init", Vec::new(), Some(player.clone()), None);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:17".parse().unwrap(),
+            "locker",
+            tx,
+        )));
+        let hb_world = world.clone();
+        let hb = std::thread::spawn(move || {
+            for _ in 0..40 {
+                let _eval = hb_world.lock_eval();
+                hb_world.heartbeat();
+            }
+        });
+        for _ in 0..40 {
+            let _eval = world.lock_eval();
+            world
+                .handle_player_input(player.clone(), "look".to_owned())
+                .expect("look");
+        }
+        hb.join().expect("heartbeat thread");
+        let out = collect_text(&mut rx);
+        assert!(
+            out.contains("LOOK:"),
+            "serialized eval should still deliver look output, got: {out}"
+        );
+    }
+
+    #[test]
     fn crypt_roundtrip_matches_login_check() {
         let program = compiler::compile_source(
             r#"
@@ -744,6 +801,15 @@ string run() {
             "/d/damned/data/weapon_db",
             "/daemon/clan_d",
         ] {
+            compiler::compile_file_in(&mudlib, path)
+                .unwrap_or_else(|error| panic!("compile {path}: {error:#}"));
+        }
+    }
+
+    #[test]
+    fn mortal_inventory_and_score_compile() {
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        for path in ["/cmds/mortal/_inventory", "/cmds/mortal/_look"] {
             compiler::compile_file_in(&mudlib, path)
                 .unwrap_or_else(|error| panic!("compile {path}: {error:#}"));
         }
@@ -923,5 +989,121 @@ int run() {
             .expect("run");
         assert_eq!(result, vm::LpcValue::Int(1));
         let _ = std::fs::remove_file(mudlib.join("log/rmudos_fs_test.log"));
+    }
+
+    #[test]
+    fn string_cast_of_zero_is_falsy() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    string file;
+    file = (string)0;
+    if (!file) return "falsy";
+    return "truthy:" + file;
+}
+"#,
+            "/test/string_cast_zero",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/string_cast_zero".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "falsy",
+            "(string)0 must be falsy like MudOS, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn inherit_colon_colon_remaps_child_globals() {
+        let root = std::env::temp_dir().join(format!(
+            "rmudos_inherit_globals_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("temp mudlib");
+        std::fs::write(
+            root.join("padding.c"),
+            "int padding;\nvoid create() { padding = 7; }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("exits.c"),
+            r#"
+mapping destinations;
+
+void create() {
+    destinations = (["north": "/dest"]);
+}
+
+void initiate_exits() {
+    if (!destinations) {
+        write("EMPTY\n");
+        return;
+    }
+    write("KEYS:" + implode(keys(destinations), ",") + "\n");
+}
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("room.c"),
+            r#"
+inherit "/padding";
+inherit "/exits";
+
+void create() {
+    padding::create();
+    exits::create();
+}
+
+void init() {
+    exits::initiate_exits();
+}
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("player.c"),
+            "void create() { enable_commands(); }\n",
+        )
+        .unwrap();
+
+        let world = MudWorld::new(DriverConfig {
+            mudlib: root.clone(),
+            ..Default::default()
+        });
+        let room = world.load_object("/room").expect("load room");
+        let player = world.load_object("/player").expect("load player");
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:19".parse().unwrap(),
+            "walker",
+            tx,
+        )));
+        world.move_object(&player, &room).expect("move");
+        let out = collect_text(&mut rx);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            out.contains("KEYS:north"),
+            "exits::initiate_exits must see child destinations, got: {out}"
+        );
+        assert!(
+            !out.contains("EMPTY"),
+            "destinations was empty (unrelocated inherit globals): {out}"
+        );
     }
 }

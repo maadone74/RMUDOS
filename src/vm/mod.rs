@@ -34,6 +34,9 @@ pub struct MudWorld {
     pub call_outs: CallOutQueue,
     /// Living name → object registry for `set_living_name` / `find_living`.
     pub(crate) livings: RwLock<HashMap<String, ORef>>,
+    /// MudOS is single-threaded: only one LPC evaluation may run at a time.
+    /// Heartbeats and player input must not interleave or object mutexes deadlock.
+    eval_lock: Mutex<()>,
 }
 
 impl MudWorld {
@@ -50,7 +53,14 @@ impl MudWorld {
             shutdown_requested: AtomicBool::new(false),
             call_outs: CallOutQueue::new(),
             livings: RwLock::new(HashMap::new()),
+            eval_lock: Mutex::new(()),
         }
+    }
+
+    /// Hold while running any LPC apply (input, heart_beat, call_out, connect).
+    /// Do not take this from inside `apply` — `command()` re-enters on the same thread.
+    pub fn lock_eval(&self) -> parking_lot::MutexGuard<'_, ()> {
+        self.eval_lock.lock()
     }
 
     pub fn object(&self, id: Oid) -> Option<ORef> {
@@ -80,23 +90,21 @@ impl MudWorld {
     }
 
     pub fn all_objects(&self) -> Vec<ORef> {
-        self.objects
-            .read()
-            .values()
+        let objects: Vec<ORef> = self.objects.read().values().cloned().collect();
+        objects
+            .into_iter()
             .filter(|object| !object.lock().destructed)
-            .cloned()
             .collect()
     }
 
     pub fn users(&self) -> Vec<ORef> {
-        self.objects
-            .read()
-            .values()
+        let objects: Vec<ORef> = self.objects.read().values().cloned().collect();
+        objects
+            .into_iter()
             .filter(|object| {
                 let object = object.lock();
                 !object.destructed && object.interactive.is_some()
             })
-            .cloned()
             .collect()
     }
 
@@ -262,9 +270,10 @@ impl MudWorld {
             g.pending_input = None;
             if let Some(env) = g.environment.take().and_then(|w| w.upgrade()) {
                 let oid = g.id;
-                env.lock()
-                    .inventory
-                    .retain(|item| !Arc::ptr_eq(item, object) && item.lock().id != oid);
+                env.lock().inventory.retain(|item| {
+                    !Arc::ptr_eq(item, object)
+                        && item.try_lock().map(|g| g.id != oid).unwrap_or(true)
+                });
             }
             let inventory = std::mem::take(&mut g.inventory);
             for child in inventory {
@@ -287,10 +296,11 @@ impl MudWorld {
             let mut g = object.lock();
             let oid = g.id;
             if let Some(env) = g.environment.take().and_then(|w| w.upgrade()) {
-                // Do not re-lock `object` while its mutex is already held.
-                env.lock()
-                    .inventory
-                    .retain(|item| !Arc::ptr_eq(item, object) && item.lock().id != oid);
+                // Do not re-lock `object` (or other inventory) while `object` is held.
+                env.lock().inventory.retain(|item| {
+                    !Arc::ptr_eq(item, object)
+                        && item.try_lock().map(|g| g.id != oid).unwrap_or(true)
+                });
             }
             g.environment = Some(Arc::downgrade(destination));
         }
@@ -298,13 +308,19 @@ impl MudWorld {
         // MudOS: drop sentences from objects no longer nearby, then re-init.
         self.prune_stale_actions(object);
         // MudOS: room/object init during a move sees the moving object as this_player.
-        let _ = self.apply(
+        if let Err(error) = self.apply(
             destination.clone(),
             "init",
             Vec::new(),
             Some(object.clone()),
             Some(object.clone()),
-        );
+        ) {
+            tracing::warn!(
+                error = %format!("{error:#}"),
+                dest = %destination.lock().name,
+                "destination init() failed"
+            );
+        }
         let inventory = destination.lock().inventory.clone();
         for item in inventory {
             if Arc::ptr_eq(&item, object) || item.lock().destructed {
@@ -382,11 +398,14 @@ impl MudWorld {
                 guard.heart_beat != 0 && guard.program.has_function("heart_beat")
             };
             if enabled {
+                let name = object.lock().name.clone();
+                tracing::debug!(%name, "heart_beat start");
                 if let Err(error) =
                     self.apply_with_origin(object, "heart_beat", Vec::new(), None, None, "driver")
                 {
-                    tracing::warn!(error = %format!("{error:#}"), "heart_beat failed");
+                    tracing::warn!(%name, error = %format!("{error:#}"), "heart_beat failed");
                 }
+                tracing::debug!(%name, "heart_beat end");
             }
         }
     }

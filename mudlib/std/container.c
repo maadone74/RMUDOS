@@ -130,7 +130,7 @@ int add_encumbrance(int enc) {
 
 string describe_living_contents(object *exclude) {
 
-    object *inv;
+    object *inv, *livs;
 
     mapping list;
 
@@ -144,9 +144,24 @@ string describe_living_contents(object *exclude) {
 
   if(!exclude) exclude = ({});
 
-    i = sizeof(inv = filter_array(all_inventory(this_object())-exclude,
+    /* Do not use filter_array functionals or `arr -= ({ 0 })` here:
+     * object PartialEq / array-subtract has hung this driver after the
+     * room description is already sent. */
+    inv = all_inventory(this_object());
+    livs = ({});
+    i = sizeof(inv);
+    while(i--) {
+	if(!inv[i] || !living(inv[i])) continue;
+	if(exclude && sizeof(exclude)) {
+	    x = sizeof(exclude);
+	    while(x--)
+		if(exclude[x] == inv[i]) break;
+	    if(x >= 0) continue;
+	}
+	livs += ({ inv[i] });
+    }
 
-      (: living :)));
+    i = sizeof(livs);
 
     if(!i) return "";
 
@@ -158,7 +173,7 @@ string describe_living_contents(object *exclude) {
 
 	  ((effective_light(previous_object()) - 2) * 8);
 
-   	if(inv[i]->query_hiding() && skill_contest((int)inv[i]->query_hiding(),
+   	if(livs[i]->query_hiding() && skill_contest((int)livs[i]->query_hiding(),
 
 						   x, 1) != 2 &&
 
@@ -166,23 +181,23 @@ string describe_living_contents(object *exclude) {
 
 	  continue;
 
-        if(!(tmp = (string)inv[i]->query_short())) {
+        tmp = livs[i]->query_short();
 
-            if(wizardp(inv[i]) || random(101)> (int)previous_object()->query_level()) continue;
+        if(!stringp(tmp) || tmp == "") {
+
+            if(wizardp(livs[i]) || random(101)> (int)previous_object()->query_level()) continue;
 
             tmp = "a shadow";
 
         }
 
-	if(inv[i]->query_invis() && !previous_object()->query("see invis")) 
+	if(livs[i]->query_invis() && !previous_object()->query("see invis")) 
 
 	  continue;
 
-        if(!tmp); else
+        if(!list[tmp]) list[tmp] = ({ livs[i] });
 
-        if(!list[tmp]) list[tmp] = ({ inv[i] });
-
-        else list[tmp] += ({ inv[i] });
+        else list[tmp] += ({ livs[i] });
 
     }
 
@@ -206,7 +221,7 @@ string describe_living_contents(object *exclude) {
 
 string describe_item_contents(object *exclude) {
 
-    object *inv;
+    object *inv, *items;
 
     mapping list;
 
@@ -218,9 +233,21 @@ string describe_item_contents(object *exclude) {
 
 
 
-    i = sizeof(inv = filter_array((all_inventory(this_object())-exclude),
+    inv = all_inventory(this_object());
+    items = ({});
+    i = sizeof(inv);
+    while(i--) {
+	if(!inv[i] || living(inv[i])) continue;
+	if(exclude && sizeof(exclude)) {
+	    x = sizeof(exclude);
+	    while(x--)
+		if(exclude[x] == inv[i]) break;
+	    if(x >= 0) continue;
+	}
+	items += ({ inv[i] });
+    }
 
-      "filter_non_living", this_object()));
+    i = sizeof(items);
 
     if(!i) return "";
 
@@ -228,13 +255,13 @@ string describe_item_contents(object *exclude) {
 
     while(i--) {
 
-        if(!(tmp = (string)inv[i]->query_short())) continue;
+        tmp = items[i]->query_short();
 
-        if(tmp == "") continue;
+        if(!stringp(tmp) || tmp == "") continue;
 
-        if(!list[tmp]) list[tmp] = ({ inv[i] });
+        if(!list[tmp]) list[tmp] = ({ items[i] });
 
-        else list[tmp] += ({inv[i] });
+        else list[tmp] += ({ items[i] });
 
     }
 
@@ -273,8 +300,6 @@ string describe_item_contents(object *exclude) {
     return ret+" are here.";
 
 }
-
-
 
 
 

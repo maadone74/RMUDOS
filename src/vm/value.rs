@@ -180,7 +180,12 @@ impl PartialEq for LpcValue {
                 if std::sync::Arc::ptr_eq(left, right) {
                     true
                 } else {
-                    left.lock().id == right.lock().id
+                    // Never nest object mutexes: same-thread deadlock if both
+                    // Arcs alias one object, or lock-order inversion across threads.
+                    match (left.try_lock(), right.try_lock()) {
+                        (Some(a), Some(b)) => a.id == b.id,
+                        _ => false,
+                    }
                 }
             }
             (Self::Function(left), Self::Function(right)) => Arc::ptr_eq(left, right),

@@ -37,8 +37,8 @@ y 0
 env_var (["SCORE":"off","TERM":"unknown"])
 money 0
 invis 0
-ok_to_heal 15
-player_age 4
+ok_to_heal 18
+player_age 10
 sight_bonus 0
 description 0
 gender "male"
@@ -73,8 +73,8 @@ default_who 0
 inf_block ({0})
 real_name "dev"
 email "d@d.com"
-ip "192.168.7.194"
-last_on "ctime(1786931555)"
+ip "127.0.0.1"
+last_on "ctime(1786936917)"
 password "EM3779cb3c994"
 cpath 0
 race 0

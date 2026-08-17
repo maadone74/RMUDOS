@@ -1,13 +1,13 @@
 //	_inventory.c written by Descartes October 1992
 
-#include "move.h"
+#include <move.h>
 #include <std.h>
 
 inherit DAEMON;
 
 int cmd_inventory() {
    object *items ;
-   int x,silly;
+    int x,silly;
    string result;
     if(effective_light(this_player()) < 0) {
 	notify_fail("It is too dark.\n");

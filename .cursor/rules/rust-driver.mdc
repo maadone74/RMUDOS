@@ -1,0 +1,14 @@
+---
+description: Rust driver conventions for compiler, VM, and efuns
+globs: RMUDOS/src/**/*.rs
+alwaysApply: false
+---
+
+# Rust driver
+
+- Missing applies return null (optional hooks). Missing `call_other` returns `0`.
+- New efuns: register in `efun/mod.rs` or `efun/mudos_extra.rs`. Soft-fail mudlib-required stubs (e.g. sockets → `EESOCKET`) rather than crash.
+- `crypt()` is MudOS 2-char salt; hash the salt+password, store two-char salt.
+- `sprintf` must accept MudOS forms (`%|`, `%'-='`, `%-+`, `%*`).
+- Prefer targeted tests in `src/lib.rs` for efun/apply behavior. Avoid full newchar→`get_dir` smoke on this machine (OneDrive hang).
+- After a driver change: `cargo build --release` from `RMUDOS/`, **kill the old process**, restart the new binary. Mudlib LPC reloads on object reload/restart only.

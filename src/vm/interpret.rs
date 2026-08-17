@@ -1,5 +1,5 @@
 use super::object::ObjectRef;
-use super::program::{FunctionInfo, Op, Program};
+use super::program::{relocate_function_to_globals, FunctionInfo, Op, Program};
 use super::value::LpcValue;
 use super::MudWorld;
 use anyhow::{bail, Context, Result};
@@ -389,6 +389,21 @@ impl<'a> Interpreter<'a> {
                                 function.defining_path
                             )
                         })?;
+                        // Inherit bodies are compiled against their own global
+                        // layout. The child object stores merged globals, so
+                        // `exits::initiate_exits()` must remap names (MudOS).
+                        let object_globals = object_program.globals.clone();
+                        let from_program = Self::find_program_by_path(
+                            &object_program,
+                            &called.defining_path,
+                        )
+                        .unwrap_or_else(|| search_root.clone());
+                        let called = relocate_function_to_globals(
+                            &called,
+                            &from_program.globals,
+                            &object_globals,
+                        )
+                        .map_err(|error| anyhow::anyhow!(error))?;
                         let result = self.execute(called, arguments)?;
                         stack.push(result);
                     }
@@ -585,6 +600,9 @@ fn cast_value(value: LpcValue, type_name: &str) -> Result<LpcValue> {
         // `(string *)arr` is a no-op pointer cast in MudOS; parser strips `*`.
         "string" => match value {
             LpcValue::Array(array) => LpcValue::Array(array),
+            // MudOS: `(string)0` stays 0 (falsy). `"0"` is truthy and makes
+            // `if (!(file = (string)find_cmd()))` call_other("0", ...).
+            LpcValue::Null | LpcValue::Int(0) => LpcValue::Int(0),
             other => LpcValue::String(other.to_string()),
         },
         "object" => match value {

@@ -1,7 +1,7 @@
 //   A watchdog for the delayed_function_d to make
 //   sure its heartbeat is always pumping.
 
-#define FUNCTION_D "/adm/daemon/delayed_funtion_d"
+#define FUNCTION_D "/adm/daemon/delayed_function_d"
 
 int check;
 

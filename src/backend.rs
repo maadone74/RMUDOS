@@ -27,12 +27,19 @@ pub async fn run(world: Arc<MudWorld>) -> Result<()> {
         let mut reset_tick = 0u64;
         loop {
             tick.tick().await;
-            world_hb.process_call_outs();
-            world_hb.heartbeat();
             reset_tick += 1;
-            if reset_tick % 30 == 0 {
-                world_hb.process_resets();
-            }
+            let do_reset = reset_tick % 30 == 0;
+            let world = world_hb.clone();
+            // LPC must not run on the tokio worker concurrently with player input.
+            let _ = tokio::task::spawn_blocking(move || {
+                let _eval = world.lock_eval();
+                world.process_call_outs();
+                world.heartbeat();
+                if do_reset {
+                    world.process_resets();
+                }
+            })
+            .await;
             if world_hb.is_shutting_down() {
                 break;
             }
@@ -73,11 +80,21 @@ async fn handle_connection(
     // Yield so the IO task can attach to the socket before we emit text.
     tokio::task::yield_now().await;
 
-    let player = match simulate::connect_player(&world, peer, tx) {
-        Ok(player) => player,
-        Err(error) => {
+    let world_connect = world.clone();
+    let player = match tokio::task::spawn_blocking(move || {
+        let _eval = world_connect.lock_eval();
+        simulate::connect_player(&world_connect, peer, tx)
+    })
+    .await
+    {
+        Ok(Ok(player)) => player,
+        Ok(Err(error)) => {
             let _ = tokio::time::timeout(std::time::Duration::from_millis(100), io).await;
             return Err(error);
+        }
+        Err(error) => {
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(100), io).await;
+            return Err(anyhow::anyhow!(error));
         }
     };
     // Keep the Interactive Arc so we can follow `exec()` onto /std/user.
@@ -99,8 +116,13 @@ async fn handle_connection(
         let world_input = world.clone();
         let player_input = player.clone();
         // LPC apply is sync and can be long; do not block the tokio worker.
+        // eval_lock: only one LPC evaluation in the process (MudOS single-thread).
         match tokio::task::spawn_blocking(move || {
-            world_input.handle_player_input(player_input, line)
+            let _eval = world_input.lock_eval();
+            tracing::debug!("player input start");
+            let result = world_input.handle_player_input(player_input, line);
+            tracing::debug!("player input end");
+            result
         })
         .await
         {
@@ -116,6 +138,7 @@ async fn handle_connection(
     }
 
     if let Some(player) = find_interactive_owner(&world, &interactive) {
+        let _eval = world.lock_eval();
         player.lock().interactive = None;
         let _ = simulate::destruct_object(&world, player);
     }

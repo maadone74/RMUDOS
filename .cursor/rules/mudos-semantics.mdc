@@ -1,0 +1,14 @@
+---
+description: MudOS runtime semantics RMUDOS must match
+alwaysApply: true
+---
+
+# MudOS semantics (non-negotiable)
+
+- **`add_action`**: sentence lives on the command giver (`this_player`); callback runs on `current_object`. Dispatch is **LIFO** (newest first). Catch-all `add_action(fun, "", 1)` gets the trailing arg; bare verb → no arg (falsy `0`), not `""`.
+- **`exec()` then `setup()`**: login may still be `this_player` while `/std/user` registers `cmd_hook`. Bind living self-actions to the living (`commands_enabled`), not leftover login.
+- **`init()` on move**: destination, then dest inventory, then mover. `this_player` is the moving living. Prune sentences whose owner is no longer nearby.
+- **`input_to`**: pending on the **interactive**; callback on the caller; `this_player` is the player. `command()` must not steal pending input. Failed callbacks restore pending.
+- **`write` / `command`**: prefer the interactive player, not the caller, after `exec`.
+- **simul_efun** overrides same-named efuns unless `efun::`. `origin()` must distinguish local / call_other / call_out / driver / simul.
+- **`query_verb` / `notify_fail`**: read/write the **player**, not the room.

@@ -1,0 +1,16 @@
+---
+description: Avoid session hangs on cloud FS and keep newchar playable
+alwaysApply: true
+---
+
+# Playability and filesystem hangs
+
+This checkout often sits on OneDrive. `get_dir`, recursive loads, and first clone of `BBOARD_D` / `SOUL_D` / news can freeze the telnet session with no error.
+
+When a command "hangs":
+1. Suspect FS in `cmd_hook` → `CMD_D->find_cmd` → `rehash`/`get_dir`, or loading a dest room.
+2. Soft-fail: `catch(...)` and return `0` / a message. Do not wait on directory listings in the command path.
+3. Destination rooms: `catch(find_object_or_load(dest))`; tell the player the room is unavailable rather than blocking.
+4. Linux/local disk reduces hangs; it does **not** fix wrong `add_action`/`this_player` semantics.
+
+After driver rebuilds, fully restart `rmudos`. Stale processes keep old `add_action` behavior.
