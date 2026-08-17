@@ -54,6 +54,7 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("base_name", base_name);
     functions.insert("regexp", regexp_efun);
     functions.insert("add_action", add_action);
+    functions.insert("clear_actions", clear_actions);
     functions.insert("notify_fail", notify_fail);
     functions.insert("query_verb", query_verb);
     functions.insert("command", command_efun);
@@ -825,21 +826,58 @@ fn add_action(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Re
         bail!("add_action requires string or function");
     }
     let catch_all = verb.is_empty() || flag != 0;
-    interpreter
-        .current_object
+    // MudOS: sentences live on the command giver (`this_player`), while the
+    // defining object (`current_object`) owns the callback function.
+    let owner = interpreter.current_object.clone();
+    let giver = match &interpreter.this_player {
+        // After exec(), login may still be this_player while user::setup()
+        // registers cmd_hook/quit on the living — attach to the living.
+        Some(tp)
+            if owner.lock().commands_enabled && !std::sync::Arc::ptr_eq(tp, &owner) =>
+        {
+            owner.clone()
+        }
+        Some(tp) => tp.clone(),
+        None => owner.clone(),
+    };
+    giver.lock().actions.push(Action {
+        verb,
+        fun,
+        catch_all,
+        owner,
+    });
+    Ok(LpcValue::Int(1))
+}
+
+fn clear_actions(
+    interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    // Drop sentences this object previously registered on the command giver.
+    let owner = interpreter.current_object.clone();
+    let giver = match &interpreter.this_player {
+        Some(tp)
+            if owner.lock().commands_enabled && !std::sync::Arc::ptr_eq(tp, &owner) =>
+        {
+            owner.clone()
+        }
+        Some(tp) => tp.clone(),
+        None => owner.clone(),
+    };
+    giver
         .lock()
         .actions
-        .push(Action {
-            verb,
-            fun,
-            catch_all,
-        });
+        .retain(|action| !std::sync::Arc::ptr_eq(&action.owner, &owner));
     Ok(LpcValue::Int(1))
 }
 
 fn notify_fail(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     require(&arguments, 1, "notify_fail")?;
-    interpreter.current_object.lock().notify_fail = Some(arguments[0].to_string());
+    let target = interpreter
+        .this_player
+        .clone()
+        .unwrap_or_else(|| interpreter.current_object.clone());
+    target.lock().notify_fail = Some(arguments[0].to_string());
     Ok(LpcValue::Int(0))
 }
 

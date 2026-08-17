@@ -230,6 +230,7 @@ protected void init_stats() { stats = ([]); }
  */
 nomask protected int cmd_hook(string cmd) {
     string file, verb, abcmd;
+    int res;
 
     verb = query_verb();
     did_command(cmd);
@@ -250,7 +251,10 @@ nomask protected int cmd_hook(string cmd) {
 	/* Skip SOUL_D / CHAT_D fallback: first SOUL_D load hangs this driver. */
 	return 0;
     }
-    return (int)call_other(file, "cmd_"+verb, cmd);
+    res = 0;
+    if(catch(res = (int)call_other(file, "cmd_"+verb, cmd)))
+	return 0;
+    return res;
 }
 
 void did_command(string str) {

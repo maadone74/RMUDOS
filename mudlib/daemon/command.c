@@ -27,12 +27,7 @@ string find_cmd(string cmd, string *path) {
 
     if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
       return sprintf("%s/_%s", tmp[0], cmd);
-    else {
-        tmp = (path & __Paths);
-        if(sizeof(tmp = path - tmp)) rehash(tmp);
-        if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
-          return sprintf("%s/_%s", tmp[0], cmd);
-      }
+    /* Skip on-demand rehash(get_dir): cloud/OneDrive FS can hang the session. */
     return 0;
   }
 

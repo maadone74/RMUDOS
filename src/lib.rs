@@ -505,6 +505,86 @@ void create() {
     }
 
     #[test]
+    fn room_add_action_binds_to_this_player() {
+        let room_prog = compiler::compile_source(
+            r#"
+int use_exit() {
+    write("MOVED:" + query_verb() + "\n");
+    return 1;
+}
+
+int use_stupid_exit() {
+    write("STUPID\n");
+    return 1;
+}
+
+void init() {
+    add_action("use_stupid_exit", "north");
+    add_action("use_exit", "north");
+}
+"#,
+            "/test/exit_room",
+        )
+        .expect("compile room");
+        let player_prog = compiler::compile_source(
+            r#"
+void create() { enable_commands(); }
+"#,
+            "/test/exit_player",
+        )
+        .expect("compile player");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let room_id = world.allocate_object_id();
+        let room = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            room_id,
+            "/test/exit_room".to_owned(),
+            std::sync::Arc::new(room_prog),
+        )));
+        world.objects.write().insert(room_id, room.clone());
+        let player_id = world.allocate_object_id();
+        let player = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            player_id,
+            "/test/exit_player".to_owned(),
+            std::sync::Arc::new(player_prog),
+        )));
+        world.objects.write().insert(player_id, player.clone());
+        let _ = world.apply(player.clone(), "create", Vec::new(), None, None);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:13".parse().unwrap(),
+            "walker",
+            tx,
+        )));
+        world
+            .move_object(&player, &room)
+            .expect("move into room");
+        assert!(
+            !player.lock().actions.is_empty(),
+            "room init should register actions on the player"
+        );
+        assert!(
+            room.lock().actions.is_empty(),
+            "MudOS keeps sentences on the living, not the room"
+        );
+        world
+            .handle_player_input(player.clone(), "north".to_owned())
+            .expect("north");
+        let out = collect_text(&mut rx);
+        assert!(
+            out.contains("MOVED:north"),
+            "LIFO should prefer use_exit over use_stupid_exit, got: {out}"
+        );
+        assert!(
+            !out.contains("STUPID"),
+            "stub exit must not win, got: {out}"
+        );
+    }
+
+    #[test]
     fn input_to_binds_to_interactive_not_caller() {
         let room_prog = compiler::compile_source(
             r#"

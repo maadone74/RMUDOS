@@ -295,6 +295,8 @@ impl MudWorld {
             g.environment = Some(Arc::downgrade(destination));
         }
         destination.lock().inventory.push(object.clone());
+        // MudOS: drop sentences from objects no longer nearby, then re-init.
+        self.prune_stale_actions(object);
         // MudOS: room/object init during a move sees the moving object as this_player.
         let _ = self.apply(
             destination.clone(),
@@ -303,6 +305,19 @@ impl MudWorld {
             Some(object.clone()),
             Some(object.clone()),
         );
+        let inventory = destination.lock().inventory.clone();
+        for item in inventory {
+            if Arc::ptr_eq(&item, object) || item.lock().destructed {
+                continue;
+            }
+            let _ = self.apply(
+                item,
+                "init",
+                Vec::new(),
+                Some(object.clone()),
+                Some(object.clone()),
+            );
+        }
         let _ = self.apply(
             object.clone(),
             "init",
@@ -311,6 +326,21 @@ impl MudWorld {
             Some(object.clone()),
         );
         Ok(())
+    }
+
+    /// Remove `add_action` sentences whose owner is no longer near the living.
+    fn prune_stale_actions(&self, living: &ORef) {
+        let mut nearby: Vec<ORef> = vec![living.clone()];
+        if let Some(env) = living.lock().environment() {
+            nearby.push(env.clone());
+            nearby.extend(env.lock().inventory.clone());
+        }
+        nearby.extend(living.lock().inventory.clone());
+        living.lock().actions.retain(|action| {
+            nearby
+                .iter()
+                .any(|object| Arc::ptr_eq(object, &action.owner))
+        });
     }
 
     pub fn boot_master(&self) -> Result<ORef> {
@@ -512,91 +542,75 @@ impl MudWorld {
         let (verb, arg) = split_verb(line);
         player.lock().last_verb = Some(verb.clone());
 
-        let mut targets = Vec::new();
-        targets.push(player.clone());
-        if let Some(env) = player.lock().environment() {
-            targets.push(env.clone());
-            let inventory = env.lock().inventory.clone();
-            for item in inventory {
-                if !Arc::ptr_eq(&item, player) {
-                    targets.push(item);
-                }
-            }
-        }
-        let player_inv = player.lock().inventory.clone();
-        targets.extend(player_inv);
-
+        // MudOS: all sentences live on the command giver (the living).
         // Exact verb matches first, then catch-all (`add_action(fun, "", 1)`).
         // Catch-all receives the same trailing argument as a normal action (0 if none),
         // not the full input line — matching MudOS add_action semantics.
-        if self.dispatch_actions(&targets, player, &verb, &arg, false)? {
+        if self.dispatch_actions(player, &verb, &arg, false)? {
             return Ok(true);
         }
-        self.dispatch_actions(&targets, player, &verb, &arg, true)
+        self.dispatch_actions(player, &verb, &arg, true)
     }
 
     fn dispatch_actions(
         &self,
-        targets: &[ORef],
         player: &ORef,
         verb: &str,
         arg: &str,
         catch_all_pass: bool,
     ) -> Result<bool> {
-        for target in targets {
-            if target.lock().destructed {
+        let actions = player.lock().actions.clone();
+        // MudOS tries the most recently added action first (LIFO). Rooms
+        // register use_stupid_exit for all compass verbs, then use_exit for
+        // real exits — FIFO would always hit "You cannot go that way."
+        for action in actions.into_iter().rev() {
+            if action.owner.lock().destructed {
                 continue;
             }
-            let actions = target.lock().actions.clone();
-            // MudOS tries the most recently added action first (LIFO). Rooms
-            // register use_stupid_exit for all compass verbs, then use_exit for
-            // real exits — FIFO would always hit "You cannot go that way."
-            for action in actions.into_iter().rev() {
-                let matches = if catch_all_pass {
-                    if !action.catch_all {
-                        false
-                    } else if action.verb.is_empty() {
-                        true
-                    } else {
-                        action.verb == verb
-                            || arg == action.verb
-                            || arg.starts_with(&format!("{} ", action.verb))
-                    }
+            let matches = if catch_all_pass {
+                if !action.catch_all {
+                    false
+                } else if action.verb.is_empty() {
+                    true
                 } else {
-                    !action.catch_all && action.verb == verb
-                };
-                if !matches {
-                    continue;
+                    action.verb == verb
+                        || arg == action.verb
+                        || arg.starts_with(&format!("{} ", action.verb))
                 }
-                // MudOS: bare verb → argument is 0 (falsy), not "".
-                let args = if arg.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![value::LpcValue::String(arg.to_owned())]
-                };
-                let result = match &action.fun {
-                    value::LpcValue::String(name) => self.apply(
-                        target.clone(),
-                        name,
-                        args,
+            } else {
+                !action.catch_all && action.verb == verb
+            };
+            if !matches {
+                continue;
+            }
+            // MudOS: bare verb → argument is 0 (falsy), not "".
+            let args = if arg.is_empty() {
+                Vec::new()
+            } else {
+                vec![value::LpcValue::String(arg.to_owned())]
+            };
+            let result = match &action.fun {
+                value::LpcValue::String(name) => self.apply(
+                    action.owner.clone(),
+                    name,
+                    args,
+                    Some(player.clone()),
+                    Some(player.clone()),
+                )?,
+                value::LpcValue::Function(function) => {
+                    let mut interpreter = Interpreter::new(
+                        self,
+                        action.owner.clone(),
                         Some(player.clone()),
                         Some(player.clone()),
-                    )?,
-                    value::LpcValue::Function(function) => {
-                        let mut interpreter = Interpreter::new(
-                            self,
-                            target.clone(),
-                            Some(player.clone()),
-                            Some(player.clone()),
-                            self.config.max_cost,
-                        );
-                        interpreter.call_lpc_function(function, args)?
-                    }
-                    _ => continue,
-                };
-                if result.is_truthy() {
-                    return Ok(true);
+                        self.config.max_cost,
+                    );
+                    interpreter.call_lpc_function(function, args)?
                 }
+                _ => continue,
+            };
+            if result.is_truthy() {
+                return Ok(true);
             }
         }
         Ok(false)

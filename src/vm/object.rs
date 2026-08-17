@@ -54,6 +54,8 @@ pub struct Action {
     pub fun: LpcValue,
     /// MudOS flag: empty verb with flag treats this as a catch-all command.
     pub catch_all: bool,
+    /// Object that called `add_action` — function is applied here (MudOS `sentence->ob`).
+    pub owner: ObjectRef,
 }
 
 #[derive(Debug)]

@@ -120,8 +120,10 @@ string query_extra_long() {
 
     ret = "";
     i = sizeof(inv = all_inventory(this_object()));
-    while(i--)
-      if(tmp = (string)inv[i]->affect_environment()) ret += tmp;
+    while(i--) {
+      tmp = inv[i]->affect_environment();
+      if(stringp(tmp) && tmp != "") ret += tmp;
+    }
     return ret;
 }
 

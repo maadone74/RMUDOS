@@ -94,8 +94,9 @@ string *query_track_makers()
 }
 
 int use_exit() {
-    string verb;
+    string verb, dest;
     string *my_limbs;
+    object destob;
     int i, flag;
     
     if(this_player()->query_paralyzed()) {
@@ -107,7 +108,9 @@ int use_exit() {
        write("You can not exit while doing something else.");
        return 1;
     }
-    if(pointerp(this_player()->query_limbs()) &&
+    /* Soft-fail limb check: incomplete new_body() can list only wielding
+     * limbs and wrongly block all movement. */
+    if(0 && pointerp(this_player()->query_limbs()) &&
        pointerp(this_player()->query_wielding_limbs())) {
       my_limbs = (string *)this_player()->query_limbs();
       i = sizeof(my_limbs);
@@ -123,35 +126,50 @@ int use_exit() {
       }
     }
     if(!(verb = query_verb())) return 0;
-    if(query_exit(verb) == ROOM_VOID) {
+    /* Expand n/s/e/... aliases if somehow invoked without do_alias. */
+    if(query_exit(verb) == ROOM_VOID)
+	verb = query_full_direction(verb);
+    dest = query_exit(verb);
+    if(dest == ROOM_VOID) {
         write("Error:  Set to VOID.  Notify creator of room.\n");
         return 1;
     }
     if(!perform_pre_exits(verb)) return 1;
-//   add_tracks(verb, this_player());
-    if(!wizardp(this_player()) &&
-      !find_object_or_load(query_exit(verb))) {
+    destob = 0;
+    if(catch(destob = find_object_or_load(dest)) || !destob) {
       message("info",
               "This room is not available yet.  It should be ready "
               "in a week or two.  If it is not up by then, notify "
               "an arch.", this_player());
       return 1;
     }
-    this_player()->move_player(query_exit(verb), verb);
+    this_player()->move_player(dest, verb);
     perform_post_exits(verb);
     return 1;
 }
 
 protected void initiate_exits() {
     string *borg;
-    int i;
+    int i, j;
 
-    i = sizeof(TMPLONG);
-    while(i--) add_action("use_stupid_exit", TMPLONG[i]);
+    /* Drop prior exit actions — init() runs again on every enter. */
+    clear_actions();
     if(!destinations) return;
-    i = sizeof(borg = keys(destinations));
-    while(i--) add_action("use_exit", borg[i]);
-
+    borg = keys(destinations);
+    i = sizeof(borg);
+    while(i--) {
+	add_action("use_exit", borg[i]);
+	/* Also bind short compass forms (n/s/e/w/...). */
+	j = member_array(borg[i], TMPLONG);
+	if(j != -1)
+	    add_action("use_exit", TMPSHORT[j]);
+    }
+    /* Only stub directions that are not real exits. */
+    i = sizeof(TMPLONG);
+    while(i--) {
+	if(member_array(TMPLONG[i], borg) == -1)
+	    add_action("use_stupid_exit", TMPLONG[i]);
+    }
 }
 
 
