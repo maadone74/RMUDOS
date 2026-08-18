@@ -10,5 +10,5 @@ void create() {
     set("short", "East Gates.");
     set("long", "These are the eastern gates leading out from Newbieville. To the west is Light Way, which will take you to Town Square if you follow it.");
     add_exit(ROOMS+"lightway", "west");
-    add_exit("/d/damned/virtual/room_10_10.world", "plains");
+    /* Virtual overland rooms hang this driver on first load. */
 }

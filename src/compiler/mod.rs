@@ -46,6 +46,14 @@ pub fn compile_file_in(
     )
 }
 
+/// True when `{object_path}.c` exists under the mudlib (MudOS virtual compile
+/// is only for paths with no source file).
+pub fn source_exists(mudlib_root: impl AsRef<Path>, object_path: &str) -> bool {
+    object_file(mudlib_root.as_ref(), &normalize_object_path(object_path))
+        .ok()
+        .is_some_and(|path| path.is_file())
+}
+
 fn compile_recursive(
     root: &Path,
     object_path: &str,
@@ -59,6 +67,8 @@ fn compile_recursive(
         bail!("cyclic inheritance involving {object_path}");
     }
     let file_path = object_file(root, object_path)?;
+    tracing::info!(path = %object_path, file = %file_path.display(), "compile start");
+    let started = std::time::Instant::now();
     let source = fs::read_to_string(&file_path)
         .with_context(|| format!("failed to read LPC object {}", file_path.display()))?;
     let source = preprocess::preprocess(&source, &file_path, root)
@@ -75,6 +85,11 @@ fn compile_recursive(
     );
     visiting.remove(object_path);
     cache.insert(object_path.to_owned(), program.clone());
+    tracing::info!(
+        path = %object_path,
+        elapsed_ms = started.elapsed().as_millis(),
+        "compile done"
+    );
     Ok(program)
 }
 

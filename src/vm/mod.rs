@@ -1,5 +1,6 @@
 pub mod apply;
 pub mod call_out;
+pub mod fs_cache;
 pub mod interpret;
 pub mod object;
 pub mod program;
@@ -14,12 +15,14 @@ use crate::config::{normalize_object_path, DriverConfig};
 use crate::efun::EfunTable;
 use anyhow::{Context, Result};
 use call_out::CallOutQueue;
+use fs_cache::FsCache;
 use indexmap::IndexMap;
 use object::{Object as ObjectStruct, ObjectId as Oid, ObjectRef as ORef};
 use parking_lot::{Mutex, RwLock};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 pub struct MudWorld {
     pub config: DriverConfig,
@@ -37,6 +40,9 @@ pub struct MudWorld {
     /// MudOS is single-threaded: only one LPC evaluation may run at a time.
     /// Heartbeats and player input must not interleave or object mutexes deadlock.
     eval_lock: Mutex<()>,
+    pub(crate) started: Instant,
+    /// Stat / `get_dir` cache (MudOS-style; invalidated by write/rm/mkdir/…).
+    pub(crate) fs_cache: FsCache,
 }
 
 impl MudWorld {
@@ -54,6 +60,8 @@ impl MudWorld {
             call_outs: CallOutQueue::new(),
             livings: RwLock::new(HashMap::new()),
             eval_lock: Mutex::new(()),
+            started: Instant::now(),
+            fs_cache: FsCache::new(),
         }
     }
 
@@ -68,9 +76,31 @@ impl MudWorld {
     }
 
     pub fn find_object(&self, path: &str) -> Option<ORef> {
+        self.find_object_for(path, None)
+    }
+
+    pub fn find_object_for(&self, path: &str, viewer: Option<ORef>) -> Option<ORef> {
         let path = normalize_object_path(path);
-        let id = self.blueprints.read().get(&path).copied()?;
-        self.object(id).filter(|object| !object.lock().destructed)
+        let object = if let Some((base, clone_suffix)) = path.split_once('#') {
+            let clone_id = clone_suffix.parse::<u64>().ok()?;
+            self.all_objects()
+                .into_iter()
+                .find(|object| {
+                    let guard = object.lock();
+                    guard.name == base && guard.clone_number == Some(clone_id)
+                })?
+        } else {
+            let id = self.blueprints.read().get(&path).copied()?;
+            self.object(id).filter(|object| !object.lock().destructed)?
+        };
+        self.visible_object(object, viewer)
+    }
+
+    fn visible_object(&self, object: ORef, viewer: Option<ORef>) -> Option<ORef> {
+        if !object.lock().hidden {
+            return Some(object);
+        }
+        viewer.filter(|viewer| viewer.lock().can_hide).map(|_| object)
     }
 
     pub fn master(&self) -> Option<ORef> {
@@ -209,11 +239,29 @@ impl MudWorld {
         if let Some(existing) = self.find_object(&path) {
             return Ok(existing);
         }
+        tracing::info!(%path, "load_object start");
+        let compile_started = Instant::now();
         let program = match compiler::compile_file_in(&self.config.mudlib, &path) {
-            Ok(program) => program,
+            Ok(program) => {
+                tracing::info!(
+                    %path,
+                    elapsed_ms = compile_started.elapsed().as_millis(),
+                    "load_object compile ok"
+                );
+                program
+            }
             Err(compile_error) => {
-                // Virtual objects via master->compile_object(path)
+                tracing::warn!(
+                    %path,
+                    error = %format!("{compile_error:#}"),
+                    "load_object compile failed"
+                );
+                // MudOS compile_object is only for missing source, not compile errors.
+                if compiler::source_exists(&self.config.mudlib, &path) {
+                    return Err(compile_error).with_context(|| format!("compile {path}"));
+                }
                 if let Some(master) = self.master() {
+                    tracing::info!(%path, "load_object trying master compile_object");
                     match self.apply(
                         master,
                         "compile_object",
@@ -221,11 +269,20 @@ impl MudWorld {
                         None,
                         None,
                     ) {
-                        Ok(value::LpcValue::Object(object)) => return Ok(object),
+                        Ok(value::LpcValue::Object(object)) => {
+                            tracing::info!(%path, "load_object virtual ok");
+                            return Ok(object);
+                        }
                         Ok(value::LpcValue::String(resolved)) => {
                             return self.load_object(&resolved);
                         }
-                        _ => {}
+                        other => {
+                            tracing::warn!(
+                                %path,
+                                result = %format!("{other:?}"),
+                                "load_object compile_object did not return an object"
+                            );
+                        }
                     }
                 }
                 return Err(compile_error).with_context(|| format!("compile {path}"));
@@ -235,8 +292,13 @@ impl MudWorld {
         let object = Arc::new(Mutex::new(ObjectStruct::new(id, path.clone(), program)));
         self.objects.write().insert(id, object.clone());
         self.blueprints.write().insert(path.clone(), id);
-        self.apply(object.clone(), "create", Vec::new(), None, None)
-            .with_context(|| format!("create() in {path}"))?;
+        tracing::info!(%path, "load_object create()");
+        if let Err(err) = self.apply(object.clone(), "create", Vec::new(), None, None) {
+            self.objects.write().shift_remove(&id);
+            self.blueprints.write().remove(&path);
+            return Err(err).with_context(|| format!("create() in {path}"));
+        }
+        tracing::info!(%path, "load_object done");
         Ok(object)
     }
 

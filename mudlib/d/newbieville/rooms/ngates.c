@@ -10,5 +10,5 @@ void create() {
     set("short", "North Gates.");
     set("long", "These are the northern gates leading out from Newbieville. To the south is Majesty Avenue, which will take you to Town Square if you follow it.");
     add_exit(ROOMS+"majestyave", "south");
-    add_exit("/d/damned/virtual/room_10_10.world", "plains");
+    /* Virtual overland rooms hang this driver on first load. */
 }

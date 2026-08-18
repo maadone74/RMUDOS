@@ -84,6 +84,16 @@ pub struct Object {
     pub shadowed: Option<Weak<Mutex<Object>>>,
     pub reset_count: u64,
     pub nosave_globals: Vec<bool>,
+    /// MudOS `set_hide`: excluded from `find_object` unless viewer is hidable.
+    pub hidden: bool,
+    /// Set when `master()->valid_hide(ob)` succeeds; hidable viewers see hidden objects.
+    pub can_hide: bool,
+    /// Who is snooping this object (MudOS `query_snoop`).
+    pub snooper: Option<ObjectRef>,
+    /// Who this object is snooping (MudOS `query_snooping` / one-arg `snoop`).
+    pub snoop_target: Option<ObjectRef>,
+    /// MudOS `in_edit` — non-empty while `ed()` session is active.
+    pub editing_file: Option<String>,
 }
 
 impl Object {
@@ -119,6 +129,11 @@ impl Object {
             shadowed: None,
             reset_count: 0,
             nosave_globals,
+            hidden: false,
+            can_hide: false,
+            snooper: None,
+            snoop_target: None,
+            editing_file: None,
         }
     }
 
@@ -134,9 +149,19 @@ impl Object {
     }
 
     pub fn write(&self, message: impl Into<String>) -> bool {
-        self.interactive
-            .as_ref()
-            .is_some_and(|interactive| interactive.write(message))
+        let message = message.into();
+        let mut ok = false;
+        if let Some(interactive) = self.interactive.as_ref() {
+            ok = interactive.write(&message);
+        }
+        if let Some(snooper) = self.snooper.as_ref() {
+            let label = self
+                .living_name
+                .as_deref()
+                .unwrap_or(self.name.as_str());
+            let _ = snooper.lock().write(format!("%{label} {message}"));
+        }
+        ok
     }
 
     pub fn set_echo(&self, enable: bool) -> bool {

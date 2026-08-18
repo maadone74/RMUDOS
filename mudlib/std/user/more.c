@@ -135,8 +135,7 @@ protected void do_more(string cmd) {
         return;
     }
     __More["current"] = i;
-    message("Ninfo", "%^B_WHITE%^BLACK%^--More-- ("+
-      to_int(percent(__More["current"], __More["total"]))+"%) ", this_object());
+    write("--More-- ("+to_int(percent(__More["current"], __More["total"]))+"%) ");
     input_to("do_more");
     return;
 }

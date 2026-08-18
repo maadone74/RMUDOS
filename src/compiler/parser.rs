@@ -722,6 +722,12 @@ impl Parser {
                 }
                 Ok(Expr::String(value))
             }
+            TokenKind::StringArray(lines) => {
+                self.offset += 1;
+                Ok(Expr::Array(
+                    lines.into_iter().map(Expr::String).collect(),
+                ))
+            }
             TokenKind::DollarArg(index) => {
                 self.offset += 1;
                 Ok(Expr::DollarArg(index))

@@ -40,24 +40,13 @@ this_object()) inv[i]->remove();
 }
 
 void reset() {
-
-  object *inv, bob;
-  int i;
+  object *inv;
 
   ::reset();
   seteuid(getuid());
   inv = all_inventory(this_object());
   call_out("remove_all", 5, inv);
-  bob = present("shopkeeper", 
-                find_object_or_load("/d/damned/akkad/ak_shop8"));
-  if(bob) {
-    message("info", "Michael says in Common: Wait a second.  I've got a new
-"+
-            "shipment coming in...", environment(bob));
-    call_out("finish_deliver", 12, bob);
-  }
-  for(i = 1;i <= 6;i++)
-    call_out("clone_once", i*2);
+  /* Do not load Akkad shops or clone virtual armour from Newbieville storage. */
   return;
 }
 

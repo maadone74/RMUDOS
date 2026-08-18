@@ -13,10 +13,10 @@ pub fn preprocess(source: &str, file_path: &Path, mudlib_root: &Path) -> Result<
         include_dirs: vec![mudlib_root.join("adm").join("include")],
     };
     // Driver-provided defines that MudOS normally injects via config.h / command line.
-    state.macros.insert("MUD_NAME".to_owned(), "\"RustMud\"".to_owned());
-    state.macros.insert("__PORT__".to_owned(), "4000".to_owned());
-    state.macros.insert("__VERSION__".to_owned(), "\"rmudos 0.1\"".to_owned());
-    state.macros.insert("MUDOS_VERSION".to_owned(), "\"rmudos 0.1\"".to_owned());
+    state.macros.insert("MUD_NAME".to_owned(), Macro::Object("\"RustMud\"".to_owned()));
+    state.macros.insert("__PORT__".to_owned(), Macro::Object("4000".to_owned()));
+    state.macros.insert("__VERSION__".to_owned(), Macro::Object("\"rmudos 0.1\"".to_owned()));
+    state.macros.insert("MUDOS_VERSION".to_owned(), Macro::Object("\"rmudos 0.1\"".to_owned()));
     // MudOS-style global include (defines TO, TP, …).
     let mut preamble = String::new();
     for name in ["globals.h", "global.h"] {
@@ -36,8 +36,14 @@ pub fn preprocess(source: &str, file_path: &Path, mudlib_root: &Path) -> Result<
     Ok(preamble + &body)
 }
 
+#[derive(Clone, Debug)]
+enum Macro {
+    Object(String),
+    Function { params: Vec<String>, body: String },
+}
+
 struct Preprocessor {
-    macros: HashMap<String, String>,
+    macros: HashMap<String, Macro>,
     including: HashSet<PathBuf>,
     mudlib_root: PathBuf,
     include_dirs: Vec<PathBuf>,
@@ -137,7 +143,7 @@ impl Preprocessor {
             if skip_depth > 0 {
                 continue;
             }
-            output.push_str(&expand_macros(line, &self.macros));
+            output.push_str(&expand_macros(line, &self.macros)?);
             output.push('\n');
         }
         Ok(output)
@@ -240,12 +246,11 @@ fn split_directive(rest: &str) -> (&str, &str) {
     (directive, args)
 }
 
-fn parse_define(args: &str) -> Result<(String, String)> {
+fn parse_define(args: &str) -> Result<(String, Macro)> {
     let args = args.trim();
     if args.is_empty() {
         bail!("#define missing name");
     }
-    // Function-like macros: NAME(args) body — store whole body after name for now as empty/not supported specially
     let name_end = args
         .find(|ch: char| ch.is_whitespace() || ch == '(')
         .unwrap_or(args.len());
@@ -254,16 +259,85 @@ fn parse_define(args: &str) -> Result<(String, String)> {
         bail!("#define missing name");
     }
     if args[name_end..].starts_with('(') {
-        // Skip function-like macros (leave unexpanded as identifier).
-        return Ok((format!("__fnmacro_{name}"), String::new()));
+        let rest = &args[name_end..];
+        let close = matching_paren(rest, 0).context("unterminated function-like #define")?;
+        let params_src = rest[1..close].trim();
+        let params = if params_src.is_empty() {
+            Vec::new()
+        } else {
+            params_src
+                .split(',')
+                .map(|p| p.trim().to_string())
+                .collect()
+        };
+        if params.iter().any(|p| p.is_empty() || !is_identifier(p)) {
+            bail!("invalid function-like #define parameter list for {name}");
+        }
+        let body = rest[close + 1..].trim().to_owned();
+        return Ok((name, Macro::Function { params, body }));
     }
     let value = args[name_end..].trim().to_owned();
-    Ok((name, value))
+    Ok((name, Macro::Object(value)))
 }
 
-fn expand_macros(line: &str, macros: &HashMap<String, String>) -> String {
-    if macros.is_empty() {
-        return line.to_owned();
+fn is_identifier(word: &str) -> bool {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {}
+        _ => return false,
+    }
+    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn matching_paren(src: &str, open: usize) -> Option<usize> {
+    let chars: Vec<char> = src.chars().collect();
+    if chars.get(open) != Some(&'(') {
+        return None;
+    }
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut i = open;
+    while i < chars.len() {
+        let ch = chars[i];
+        if in_string {
+            if ch == '\\' && i + 1 < chars.len() {
+                i += 2;
+                continue;
+            }
+            if ch == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match ch {
+            '"' => in_string = true,
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn expand_macros(line: &str, macros: &HashMap<String, Macro>) -> Result<String> {
+    expand_macros_inner(line, macros, &HashSet::new(), 0)
+}
+
+fn expand_macros_inner(
+    line: &str,
+    macros: &HashMap<String, Macro>,
+    disabled: &HashSet<String>,
+    depth: usize,
+) -> Result<String> {
+    if macros.is_empty() || depth > 64 {
+        return Ok(line.to_owned());
     }
     let mut output = String::with_capacity(line.len());
     let chars: Vec<char> = line.chars().collect();
@@ -299,9 +373,148 @@ fn expand_macros(line: &str, macros: &HashMap<String, String>) -> String {
                 i += 1;
             }
             let word: String = chars[start..i].iter().collect();
-            if let Some(value) = macros.get(&word) {
-                // Avoid infinite recursion on self-define; expand once.
-                output.push_str(&expand_macros(value, macros));
+            if disabled.contains(&word) {
+                output.push_str(&word);
+                continue;
+            }
+            match macros.get(&word) {
+                Some(Macro::Object(value)) => {
+                    let mut nested = disabled.clone();
+                    nested.insert(word);
+                    output.push_str(&expand_macros_inner(value, macros, &nested, depth + 1)?);
+                }
+                Some(Macro::Function { params, body }) => {
+                    let mut j = i;
+                    while j < chars.len() && chars[j].is_whitespace() {
+                        j += 1;
+                    }
+                    if j >= chars.len() || chars[j] != '(' {
+                        output.push_str(&word);
+                        continue;
+                    }
+                    let (args, after) = parse_macro_args(&chars, j)?;
+                    if args.len() != params.len() {
+                        bail!(
+                            "macro {word} expects {} argument(s), got {}",
+                            params.len(),
+                            args.len()
+                        );
+                    }
+                    let mut nested = disabled.clone();
+                    nested.insert(word.clone());
+                    let mut substituted = body.clone();
+                    if !params.is_empty() {
+                        let replacements: HashMap<String, String> = params
+                            .iter()
+                            .cloned()
+                            .zip(args.into_iter())
+                            .collect();
+                        substituted = replace_macro_params(&substituted, &replacements)?;
+                    }
+                    output.push_str(&expand_macros_inner(
+                        &substituted, macros, &nested, depth + 1,
+                    )?);
+                    i = after;
+                }
+                None => output.push_str(&word),
+            }
+            continue;
+        }
+        output.push(ch);
+        i += 1;
+    }
+    Ok(output)
+}
+
+fn parse_macro_args(chars: &[char], open: usize) -> Result<(Vec<String>, usize)> {
+    if chars.get(open) != Some(&'(') {
+        bail!("expected '(' to start macro arguments");
+    }
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut i = open;
+    while i < chars.len() {
+        let ch = chars[i];
+        if in_string {
+            current.push(ch);
+            if ch == '\\' && i + 1 < chars.len() {
+                current.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if ch == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match ch {
+            '"' => {
+                in_string = true;
+                current.push(ch);
+            }
+            '(' => {
+                depth += 1;
+                if depth > 1 {
+                    current.push(ch);
+                }
+            }
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    if !current.trim().is_empty() || !args.is_empty() {
+                        args.push(current.trim().to_string());
+                    }
+                    return Ok((args, i + 1));
+                }
+                current.push(ch);
+            }
+            ',' if depth == 1 => {
+                args.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+        i += 1;
+    }
+    bail!("unterminated macro arguments")
+}
+
+fn replace_macro_params(body: &str, replacements: &HashMap<String, String>) -> Result<String> {
+    let mut output = String::with_capacity(body.len());
+    let chars: Vec<char> = body.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        if ch == '"' {
+            output.push(ch);
+            i += 1;
+            while i < chars.len() {
+                output.push(chars[i]);
+                if chars[i] == '\\' && i + 1 < chars.len() {
+                    output.push(chars[i + 1]);
+                    i += 2;
+                    continue;
+                }
+                if chars[i] == '"' {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        if ch.is_ascii_alphabetic() || ch == '_' {
+            let start = i;
+            i += 1;
+            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            if let Some(value) = replacements.get(&word) {
+                output.push_str(value);
             } else {
                 output.push_str(&word);
             }
@@ -310,7 +523,7 @@ fn expand_macros(line: &str, macros: &HashMap<String, String>) -> String {
         output.push(ch);
         i += 1;
     }
-    output
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -329,5 +542,31 @@ mod tests {
             eprintln!("{:>4}|{l}", i + 1);
         }
         assert!(out.contains("functionp"));
+    }
+
+    #[test]
+    fn function_like_macros_expand() {
+        let src = r#"
+#define ANSI(p) (sprintf("%c["+(p)+"m", 27))
+#define ESC(p) (sprintf("%c"+(p), 27))
+string x = ANSI(1);
+string y = ANSI("0;37;40");
+string z = ESC("G0");
+"#;
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let path = root.join("daemon/terminal_d.c");
+        let out = preprocess(src, &path, &root).expect("preprocess");
+        assert!(
+            out.contains(r#"(sprintf("%c["+(1)+"m", 27))"#),
+            "ANSI(1) should expand, got:\n{out}"
+        );
+        assert!(
+            out.contains(r#"(sprintf("%c["+("0;37;40")+"m", 27))"#),
+            "ANSI(string) should expand, got:\n{out}"
+        );
+        assert!(
+            !out.contains("ANSI("),
+            "ANSI() invocations should not remain, got:\n{out}"
+        );
     }
 }

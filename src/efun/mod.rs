@@ -65,7 +65,12 @@ impl EfunTable {
         functions.insert("stringp", stringp);
         functions.insert("objectp", objectp);
         functions.insert("intp", intp);
+        functions.insert("floatp", floatp);
+        functions.insert("clonep", clonep);
+        functions.insert("strcmp", strcmp);
         functions.insert("pointerp", pointerp);
+        functions.insert("arrayp", pointerp);
+        functions.insert("this_interactive", this_interactive);
         functions.insert("mapp", mapp);
         functions.insert("time", time);
         functions.insert("random", random_efun);
@@ -141,7 +146,7 @@ fn say(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<Lp
         .unwrap_or_else(|| interpreter.current_object.clone());
     let room = actor.lock().environment();
     if let Some(room) = room {
-        deliver_room(&room, &message, &[actor]);
+        deliver_room(interpreter, &room, "say", &message, &[actor]);
     }
     Ok(LpcValue::Int(1))
 }
@@ -167,18 +172,25 @@ fn tell_room(
         .get(2)
         .map(objects_from_value)
         .unwrap_or_default();
-    deliver_room(&room, &arguments[1].to_string(), &excludes);
+    deliver_room(
+        interpreter,
+        &room,
+        "tell_room",
+        &arguments[1].to_string(),
+        &excludes,
+    );
     Ok(LpcValue::Int(1))
 }
 
 fn message(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     require(&arguments, 3, "message")?;
+    let class = arguments[0].to_string();
     let text = arguments[1].to_string();
     let excludes = arguments
         .get(3)
         .map(objects_from_value)
         .unwrap_or_default();
-    deliver_target(interpreter, &arguments[2], &text, &excludes)?;
+    deliver_target(interpreter, &arguments[2], &class, &text, &excludes)?;
     Ok(LpcValue::Int(1))
 }
 
@@ -382,7 +394,7 @@ fn evaluate(interpreter: &mut Interpreter<'_>, mut arguments: Vec<LpcValue>) -> 
     invoke_callable(interpreter, &fun, arguments)
 }
 
-fn invoke_callable(
+pub(crate) fn invoke_callable(
     interpreter: &mut Interpreter<'_>,
     fun: &LpcValue,
     arguments: Vec<LpcValue>,
@@ -443,9 +455,13 @@ fn find_object(
     arguments: Vec<LpcValue>,
 ) -> Result<LpcValue> {
     let path = string_argument(&arguments, 0, "find_object")?;
+    let viewer = interpreter
+        .this_player
+        .clone()
+        .or_else(|| Some(interpreter.current_object.clone()));
     Ok(interpreter
         .world
-        .find_object(path)
+        .find_object_for(path, viewer)
         .map(LpcValue::Object)
         .unwrap_or(LpcValue::Null))
 }
@@ -527,6 +543,21 @@ fn this_player(
         .clone()
         .map(LpcValue::Object)
         .unwrap_or(LpcValue::Null))
+}
+
+fn this_interactive(
+    interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    if let Some(player) = interpreter.this_player.clone() {
+        if player.lock().interactive.is_some() {
+            return Ok(LpcValue::Object(player));
+        }
+    }
+    if interpreter.current_object.lock().interactive.is_some() {
+        return Ok(LpcValue::Object(interpreter.current_object.clone()));
+    }
+    Ok(LpcValue::Null)
 }
 
 fn previous_object(
@@ -948,6 +979,31 @@ fn intp(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<
     ))))
 }
 
+fn floatp(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "floatp")?;
+    Ok(LpcValue::Int(i64::from(matches!(
+        arguments[0],
+        LpcValue::Float(_)
+    ))))
+}
+
+fn clonep(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let object = if let Some(value) = arguments.first() {
+        object_argument(value, "clonep")?
+    } else {
+        interpreter.current_object.clone()
+    };
+    let is_clone = object.lock().clone_number.is_some();
+    Ok(LpcValue::Int(i64::from(is_clone)))
+}
+
+fn strcmp(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "strcmp")?;
+    let left = arguments[0].to_string();
+    let right = arguments[1].to_string();
+    Ok(LpcValue::Int(left.cmp(&right) as i64))
+}
+
 fn pointerp(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     require(&arguments, 1, "pointerp")?;
     Ok(LpcValue::Int(i64::from(matches!(
@@ -1249,7 +1305,7 @@ fn string_argument<'a>(
         .with_context(|| format!("{name} argument {} must be a string", index + 1))
 }
 
-fn object_argument(value: &LpcValue, name: &str) -> Result<ObjectRef> {
+pub(crate) fn object_argument(value: &LpcValue, name: &str) -> Result<ObjectRef> {
     match value {
         LpcValue::Object(object) if !object.lock().destructed => Ok(object.clone()),
         _ => bail!("{name} requires a live object"),
@@ -1283,14 +1339,63 @@ fn objects_from_value(value: &LpcValue) -> Vec<ObjectRef> {
     }
 }
 
-fn deliver_room(room: &ObjectRef, message: &str, excludes: &[ObjectRef]) {
+fn object_has_function(object: &ObjectRef, name: &str) -> bool {
+    let program = object.lock().program.clone();
+    Interpreter::find_function(&program, name).is_some()
+}
+
+fn is_living_object(object: &ObjectRef) -> bool {
+    let guard = object.lock();
+    !guard.destructed && (guard.commands_enabled || guard.living_name.is_some())
+}
+
+/// MudOS `message()`: apply `receive_message(class, msg)` on livings so mudlib
+/// color (`%^BOLD%^` etc.) can be translated. Fall back to a raw write when
+/// the apply is missing or errors (tests / NPCs / login objects).
+fn catch_message(interpreter: &Interpreter<'_>, object: &ObjectRef, class: &str, message: &str) {
+    if object_has_function(object, "receive_message") {
+        if let Err(err) = interpreter.world.apply_with_origin(
+            object.clone(),
+            "receive_message",
+            vec![
+                LpcValue::String(class.to_owned()),
+                LpcValue::String(message.to_owned()),
+            ],
+            interpreter.this_player.clone(),
+            Some(interpreter.current_object.clone()),
+            "driver",
+        ) {
+            tracing::debug!(error = %err, "receive_message failed");
+            let _ = object.lock().write(message.to_owned());
+        }
+    } else {
+        let _ = object.lock().write(message.to_owned());
+    }
+}
+
+fn should_catch_message(object: &ObjectRef) -> bool {
+    is_living_object(object)
+        || object_has_function(object, "receive_message")
+        || object.lock().interactive.is_some()
+}
+
+fn deliver_room(
+    interpreter: &Interpreter<'_>,
+    room: &ObjectRef,
+    class: &str,
+    message: &str,
+    excludes: &[ObjectRef],
+) {
     let inventory = room.lock().inventory.clone();
     for object in inventory {
-        if !excludes
+        if excludes
             .iter()
             .any(|excluded| Arc::ptr_eq(excluded, &object))
         {
-            object.lock().write(message.to_owned());
+            continue;
+        }
+        if should_catch_message(&object) {
+            catch_message(interpreter, &object, class, message);
         }
     }
 }
@@ -1298,6 +1403,7 @@ fn deliver_room(room: &ObjectRef, message: &str, excludes: &[ObjectRef]) {
 fn deliver_target(
     interpreter: &Interpreter<'_>,
     target: &LpcValue,
+    class: &str,
     message: &str,
     excludes: &[ObjectRef],
 ) -> Result<()> {
@@ -1307,19 +1413,21 @@ fn deliver_target(
                 .iter()
                 .any(|excluded| Arc::ptr_eq(excluded, object))
             {
-                if !object.lock().write(message.to_owned()) {
-                    deliver_room(object, message, excludes);
+                if should_catch_message(object) {
+                    catch_message(interpreter, object, class, message);
+                } else {
+                    deliver_room(interpreter, object, class, message, excludes);
                 }
             }
         }
         LpcValue::Array(values) => {
             for value in values {
-                deliver_target(interpreter, value, message, excludes)?;
+                deliver_target(interpreter, value, class, message, excludes)?;
             }
         }
         LpcValue::String(path) => {
             if let Some(object) = interpreter.world.find_object(path) {
-                deliver_room(&object, message, excludes);
+                deliver_room(interpreter, &object, class, message, excludes);
             }
         }
         LpcValue::Null => {}

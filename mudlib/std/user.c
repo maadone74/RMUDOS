@@ -318,7 +318,7 @@ void create() {
     position = "player";
     wielded = ([]);
     level = 1;
-    autosave = 500;
+    autosave = 0;
     set_weight(500);
     set_max_internal_encumbrance(2000);
     verbose_moves = 1;
@@ -393,7 +393,7 @@ protected int finish_quit(object ob) {
     }
     message("quit", "%^CYAN%^Reality suspended.  See you another time!%^RESET%^",
       ob);
-    SAVEALL_D->add_crash_items(this_object(),1);
+    catch(SAVEALL_D->add_crash_items(this_object(),1));
       TELL_CLEAN_D->clean_tell(this_object());
     ob->set_attackers( ({ }) );
     ob->stop_hunting();
@@ -484,6 +484,7 @@ void setup() {
     if(race) set("race", race);
     if(!query("race")) {
 	sight_bonus = (int)RACE_D->query_sight_bonus(query("race"));
+	set("in creation", 1);
 	move(ROOM_SETTER);
     }
     else {
@@ -492,14 +493,49 @@ void setup() {
 	    !catch(ob=load_object(tmp)) && move(ob)==MOVE_OK))
 	    move(ROOM_START);
 	setenv("start", primary_start);
+	/* Stuck mid creation (disconnect during stat/ANSI prompts). */
+	if(environment() && base_name(environment()) == ROOM_WAITING) {
+	    if(mapp(stats) && sizeof(stats)) {
+		message("info", "Finishing character creation...\n", this_object());
+		ob = 0;
+		/* Do not call remove("in creation"): remove() destructs the
+		 * player and can hang on CHAT_D / INFORM_D / MULTI_D. */
+		if(catch(ob = load_object(ROOM_NEWBIE)) || !ob ||
+		    catch(move(ob)) || environment() != ob) {
+		    message("info",
+			"Newbieville is not available yet. Type look.\n",
+			this_object());
+		    set("in creation", 0);
+		} else {
+		    setenv("start", ROOM_NEWBIE);
+		    primary_start = ROOM_NEWBIE;
+		    set("in creation", 0);
+		}
+	    }
+	    else {
+		set("in creation", 1);
+		move(ROOM_SETTER);
+	    }
+	}
     }
-    if(!stringp(tmp = getenv("TERM"))) setenv("TERM", tmp = "unknown");
+    /* Plain telnet does not send TERM. "unknown" maps %^BOLD%^ to empty,
+     * so default to ansi; players can still `setenv TERM unknown`. */
+    if(!stringp(tmp = getenv("TERM")) || tmp == "" || tmp == "unknown")
+	setenv("TERM", tmp = "ansi");
     term_info = (mapping)TERMINAL_D->query_term_info(tmp);
     write_messages();
     // Use message(this_object): after exec, this_player is still the login object.
-    message("login", "\nWelcome to the game. Type look or pick <race>.\n",
-      this_object());
-    call_out("save_player", 2, query_name());
+    if(!query("race"))
+	message("login", "\nWelcome to the game. Type look or pick <race>.\n",
+	  this_object());
+    else if(query("in creation"))
+	message("login", "\nWelcome. Finish creation — type look or follow the prompts.\n",
+	  this_object());
+    else
+	message("login", "\nWelcome back. Type look to get your bearings.\n",
+	  this_object());
+    /* heart_beat autosave handles periodic saves; defer first tick after login. */
+    autosave = player_age + 500;
     if(platinum || gold || silver || electrum || copper) {
 	add_money("electrum", electrum);
 	add_money("gold", gold);
@@ -518,7 +554,7 @@ void setup() {
 // Added these lines so wizzes couldn't just call heart_beat() and
 // get age.  - Geldron 051296
 varargs protected void heart_beat(int recurs_flag) {
-    object *inv, lyc_ob;
+    object lyc_ob;
     string tod;
     int i, tmp;
 
@@ -547,26 +583,22 @@ varargs protected void heart_beat(int recurs_flag) {
     else ok_to_heal--;
     if(disable) disable--;
     adjust_exp();
-    if( (player_age > autosave) && (!wizardp(this_object())) ) {
+    /* Skip autosave while still in the setter so the first real save
+     * happens after race/stats, not 500 heartbeats later. Also skip in
+     * waiting_room and defer immediately after login (restored player_age). */
+    if( !query("in creation") &&
+        (!environment() ||
+         member_array(base_name(environment()), ({ ROOM_SETTER, ROOM_WAITING })) == -1) &&
+        (player_age > autosave) && (!wizardp(this_object())) ) {
 	message("environment", "Autosaving.", this_object());
-	inv = filter_array(all_inventory(this_object()), 
-              (: call_other :), "query_short");
-        inv = filter_array(inv, (: ((string)$1->query($2) == $3) :),
-                           "protected by", (string)this_object()->
-                           query_name());
-        if(sizeof(inv) > 3) inv = inv[0..2];
-        SAVEALL_D->add_crash_items(this_object());
-        if(sizeof(inv)) {
-          message("environment", "%^CYAN%^Items protected: "+
-                  implode(map_array(inv, (: call_other :), "query_short"),
-                          ", ")+".", this_object());
-        }
+	/* SAVEALL_D->add_crash_items uses get_dir and can freeze the
+	 * session (and block all further input) on this driver. */
 	if(environment()) {
 	    if(!ghost)
 		setenv("start", file_name(environment()));
 	    else setenv("start", "/d/standard/square");
 	}
-	save_player(query_name());
+	catch(save_player(query_name()));
 	autosave = player_age + 500;
     }
     if(sizeof(query_attackers()) && getenv("SCORE") != "off")
@@ -683,7 +715,7 @@ varargs void net_dead(int flag) {
 	"irreality.", query_cap_name()), environment(this_object()), ({ this_object() }));
     map_array(all_inventory(this_object()), (: call_other :),
               "set", "protected by", 0);
-    SAVEALL_D->add_crash_items(this_object());
+    catch(SAVEALL_D->add_crash_items(this_object()));
 if(spell = this_object()->query_casting()){
             spell->remove();
             this_object()->set_casting(0);

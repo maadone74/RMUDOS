@@ -6,10 +6,12 @@ inherit "/std/vault";
 
 
 void reset() {
+   object ob;
    ::reset();
    seteuid(getuid());
    if (!present("michael")) {
-      new(MON+"michael")->move(this_object());
+      if (!catch(ob = new(MON+"michael")) && ob)
+         ob->move(this_object());
    }
 
     set_property("light", 4);

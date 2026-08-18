@@ -95,4 +95,26 @@ impl CallOutQueue {
         });
         due
     }
+
+    /// MudOS `call_out_info()` — ({ object, fun, delay, args... }) per pending call_out.
+    pub fn info(&self) -> Vec<(ObjectRef, LpcValue, i64, Vec<LpcValue>)> {
+        let now = Instant::now();
+        let entries = self.entries.lock();
+        entries
+            .iter()
+            .map(|entry| {
+                let delay = entry
+                    .due
+                    .saturating_duration_since(now)
+                    .as_secs_f64()
+                    .ceil() as i64;
+                (
+                    entry.object.clone(),
+                    entry.fun.clone(),
+                    delay.max(0),
+                    entry.args.clone(),
+                )
+            })
+            .collect()
+    }
 }

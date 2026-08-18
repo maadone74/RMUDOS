@@ -14,9 +14,9 @@ cmd_save(string str) {
 	return 1;
     }
     this_player()->set_disable();
-    this_player()->save_player((string)this_player()->query_name());
+    catch(this_player()->save_player((string)this_player()->query_name()));
     write(this_player()->query_cap_name()+" is now saved.");
-    "/daemon/save_all_d"->add_crash_items(this_player());
+    /* Skip SAVEALL_D: get_dir of crash-item dirs can freeze this driver. */
     return 1;
 }
 

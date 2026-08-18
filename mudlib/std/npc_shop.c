@@ -68,7 +68,7 @@ void create() {
 
 void load_store() {
   if(stringp(query("storage room")))
-    call_other(query("storage room"), "???");
+    catch(call_other(query("storage room"), "???"));
   return;
 }
 

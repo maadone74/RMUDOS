@@ -85,6 +85,9 @@ MudOS                       5 Sep 1994                          1
 string *epilog(int load_empty)
 {
   //it appears FluffOS does not have valid -e flag so we ignore load_empty
+  load_access();
+  load_groups();
+  load_privs();
   call_out("socket_preload", 5);
   return read_database(PRELOAD_DB);
 }
@@ -616,7 +619,9 @@ int load_player_from_file(string nom, object ob) {
 void save_player_to_file(object ob) {
     string nom;
 
-    if(base_name(previous_object()) != OB_USER) return;
+    if(!previous_object()) return;
+    if(previous_object() != ob && base_name(previous_object()) != OB_USER)
+        return;
     if(!(nom = (string)ob->query_name())) return;
     seteuid(UID_ROOT);
     export_uid(ob);

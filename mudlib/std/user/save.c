@@ -60,11 +60,9 @@ void assure_save_dir_exists(string file) {
     elems = explode(file, "/");
     path = "";
     for (i=0; i < sizeof(elems) - 1; i++) {
-		path += "/" + elems[i];
-		if (file_size(path) == -1) {
-	    	write("Make dir " + path + "\n");
-	    	mkdir(path);
-		}
+	path += "/" + elems[i];
+	/* Avoid file_size on save path — cloud FS can hang and block all input. */
+	catch(mkdir(path));
     }
 }
 

@@ -29,11 +29,7 @@ impl TelnetSession {
                 msg = outbound_rx.recv() => {
                     match msg {
                         Some(TelnetOut::Text(text)) => {
-                            let mut out = text;
-                            if !out.ends_with('\n') {
-                                out.push('\n');
-                            }
-                            let out = out.replace('\n', "\r\n");
+                            let out = format_telnet_text(&text);
                             writer.write_all(out.as_bytes()).await?;
                             writer.flush().await?;
                         }
@@ -68,6 +64,18 @@ impl TelnetSession {
     }
 }
 
+/// Telnet payload: `\n` → `\r\n`. Add a line break only when the LPC string
+/// has none. `receive_message` wraps with a trailing `\n` then appends color
+/// RESET, so the bytes often look like `"text\n<ESC>[0m"` — that already had a
+/// newline; adding another made a blank line after every colored message.
+pub(crate) fn format_telnet_text(text: &str) -> String {
+    let mut out = text.to_owned();
+    if !out.contains('\n') {
+        out.push('\n');
+    }
+    out.replace('\n', "\r\n")
+}
+
 fn strip_telnet_iac(input: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len());
     let mut i = 0;
@@ -90,4 +98,23 @@ fn strip_telnet_iac(input: &[u8]) -> Vec<u8> {
         i += 1;
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_telnet_text;
+
+    #[test]
+    fn color_reset_after_wrap_does_not_add_blank_line() {
+        let wrapped = "There are five obvious exits: south.\n\u{1b}[0;37;40m";
+        assert_eq!(
+            format_telnet_text(wrapped),
+            "There are five obvious exits: south.\r\n\u{1b}[0;37;40m"
+        );
+    }
+
+    #[test]
+    fn write_without_newline_still_gets_one() {
+        assert_eq!(format_telnet_text("ok"), "ok\r\n");
+    }
 }

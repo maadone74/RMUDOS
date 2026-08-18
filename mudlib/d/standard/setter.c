@@ -363,6 +363,7 @@ who = this_player();
   who->set_property("base hp regen", 3);
   set_ansi();
   who->set("in creation", 0);
+  catch(who->save_player((string)who->query_name()));
   return ;
 }
 
@@ -416,6 +417,7 @@ void set_ansi_two(string str) {
 	this_player()->setenv("TERM","unknown");
 	this_player()->reset_terminal();
           this_player()->move(ROOM_NEWBIE);
+          catch(this_player()->save_player((string)this_player()->query_name()));
        if(wizardp(this_player()) || this_player()->query_property("reincarnate")) {
           write("You are done.");
           return;
@@ -426,6 +428,7 @@ void set_ansi_two(string str) {
     else if(str == "y") {
 	write("Terminal set to ansi.");
           this_player()->move(ROOM_NEWBIE);
+          catch(this_player()->save_player((string)this_player()->query_name()));
         if(wizardp(this_player()) || this_player()->query_property("reincarnate")) {
           write("You are done.");
           return;

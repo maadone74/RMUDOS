@@ -1,22 +1,22 @@
-encumbrance 1
-props (["general":(["hp":3,"max_hp":50,"sp":1,"max_sp":0,"exp buffer":0]),"light":0])
+encumbrance 500
+props (["light":0,"ambidextry":0,"sp points":0,"extra hp regen":30,"extra mp regen":0,"melee damage":(["impact":10]),"xp mod":-30,"enhance criticals":(["impact":-1]),"natural ac":15,"physical resistance":(["iron":10,"wood":10,"steel":10,"default":10]),"combat color":"%^BOLD%^","handedness":"left hand","dev points":70,"dev point base":70,"base mp regen":3,"base hp regen":3])
 true_name "rylo"
 creator "/adm/obj/login#1"
 material 0
 possible_to_close 0
 is_closed 0
-max_internal_encumbrance 0
+max_internal_encumbrance 3360
 deaths 0
-player_data (["general":(["hp":3,"max_hp":50,"sp":1,"max_sp":0,"exp buffer":0])])
-magic (["points":0,"max points":0])
+player_data (["general":(["hp":29,"max_hp":105,"sp":1,"max_sp":595,"exp buffer":0])])
+magic (["points":0,"max points":80])
 severed ([])
 healing ([])
-body ([])
-limbs ({})
-all_my_fingers 0
+body (["torso":(["limb_ref":"FATAL","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"head":(["limb_ref":"FATAL","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"right arm":(["limb_ref":"right hand","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"right hand":(["limb_ref":"","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"wieldable":1,"weapon":0]),"left arm":(["limb_ref":"left hand","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"left hand":(["limb_ref":"","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"wieldable":1,"weapon":0]),"left leg":(["limb_ref":"left foot","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"left foot":(["limb_ref":"","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"right leg":(["limb_ref":"right foot","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0]),"right foot":(["limb_ref":"","max_dam":52,"damage":0,"ac":0,"armour":({}),"armour_ob":({}),"weapons":0,"weapon":0])])
+limbs ({"torso","head","right arm","right hand","left arm","left hand","left leg","left foot","right leg","right foot"})
+all_my_fingers 4
 heal_rate 1
-char_class 0
-skills (["melee":(["level":0,"points":0,"max":0]),"attack":(["level":0,"points":0,"max":0])])
+char_class "child"
+skills (["melee":(["level":0,"points":0,"max":0,"stat":"strength"]),"attack":(["level":5,"points":0,"max":0,"stat":"dexterity"]),"prospecting":(["level":10,"stat":"intelligence"]),"earth lore":(["level":10,"stat":"intelligence"]),"elementalism":(["level":10,"stat":"intelligence"]),"trade lore":(["level":5,"stat":"charisma"]),"dodge":(["level":0,"stat":"dexterity"]),"parry":(["level":0,"stat":"dexterity"])])
 spells ([])
 wimpy 0
 wimpydir "out"
@@ -34,16 +34,16 @@ parry_bonus 0
 has_shield 0
 skill 0
 y 0
-env_var (["SCORE":"off","TERM":"unknown"])
+env_var (["SCORE":"off","TERM":"unknown","TITLE":"Novice $N the Pech","start":"/d/standard/waiting_room"])
 money 0
 invis 0
-ok_to_heal 18
-player_age 10
-sight_bonus 0
+ok_to_heal 49
+player_age 46
+sight_bonus 3
 description 0
 gender "male"
-stats ([])
-languages 0
+stats (["charisma":40,"wisdom":45,"dexterity":85,"intelligence":81,"constitution":112,"strength":112])
+languages (["common":10])
 primary_language 0
 language_exp 0
 xp_to_next_dev 0
@@ -62,7 +62,7 @@ ghost 0
 crash_money 0
 rolls 0
 verbose_moves 1
-birth 1786920954
+birth 1787012168
 blocked 0
 colours 0
 bank 0
@@ -71,16 +71,16 @@ keep 0
 snatch "off"
 default_who 0
 inf_block ({0})
-real_name "dev"
-email "d@d.com"
+real_name "Devon"
+email "devon.weaver@gmail.com"
 ip "127.0.0.1"
-last_on "ctime(1786936917)"
-password "EM3779cb3c994"
+last_on "ctime(1787012729)"
+password "1s3778497c1a1"
 cpath 0
-race 0
-original_site "192.168.7.194"
+race "pech"
+original_site "127.0.0.1"
 position "player"
-primary_start 0
+primary_start "/d/standard/waiting_room"
 mini_quests 0
 quests 0
 mysites 0

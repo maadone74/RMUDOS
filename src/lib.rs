@@ -29,6 +29,9 @@ mod compile_smoke {
             "/adm/obj/master",
             "/adm/obj/simul_efun",
             "/adm/daemon/news_d",
+            "/daemon/command",
+            "/cmds/mortal/_who",
+            "/daemon/terminal_d",
         ] {
             compiler::compile_file_in(&mudlib, path)
                 .unwrap_or_else(|e| panic!("{path}: {e:#}"));
@@ -1104,6 +1107,512 @@ void init() {
         assert!(
             !out.contains("EMPTY"),
             "destinations was empty (unrelocated inherit globals): {out}"
+        );
+    }
+
+    #[test]
+    fn ctime_formats_unix_epoch() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    return ctime(0);
+}
+"#,
+            "/test/ctime_epoch",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/ctime_epoch".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "Thu Jan  1 00:00:00 1970",
+            "ctime(0) must be MudOS-shaped, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn base_name_strips_clone_id() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    return base_name("/std/user#12");
+}
+"#,
+            "/test/base_name_clone",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/base_name_clone".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "/std/user",
+            "base_name must strip #clone, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn strcmp_orders_lexicographically() {
+        let program = compiler::compile_source(
+            r#"
+int run() {
+    return strcmp("apple", "banana");
+}
+"#,
+            "/test/strcmp",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/strcmp".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert!(
+            result.as_int().unwrap_or(0) < 0,
+            "apple < banana, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn clonep_detects_clone_number() {
+        let program = compiler::compile_source(
+            r#"
+int run(object ob) {
+    return clonep(ob);
+}
+"#,
+            "/test/clonep",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/clonep".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        object.lock().clone_number = Some(7);
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(
+                object.clone(),
+                "run",
+                vec![vm::LpcValue::Object(object.clone())],
+                None,
+                None,
+            )
+            .expect("run");
+        assert_eq!(result.as_int(), Some(1));
+    }
+
+    #[test]
+    fn floatp_and_map_mapping_smoke() {
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    mapping m = ([ "a": 1, "b": 2 ]);
+    if (!floatp(1.5)) return "no-float";
+    return map_mapping(m, (: $2 + 10 :));
+}
+"#,
+            "/test/map_mapping",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/map_mapping".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let vm::LpcValue::Mapping(mapped) = result else {
+            panic!("expected mapping, got {result:?}");
+        };
+        assert_eq!(mapped.get("a").and_then(|v| v.as_int()), Some(11));
+        assert_eq!(mapped.get("b").and_then(|v| v.as_int()), Some(12));
+    }
+
+    #[test]
+    fn call_out_info_lists_pending() {
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    call_out("noop", 5);
+    return call_out_info();
+}
+void noop() {}
+"#,
+            "/test/call_out_info",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/call_out_info".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let vm::LpcValue::Array(rows) = result else {
+            panic!("expected array, got {result:?}");
+        };
+        assert_eq!(rows.len(), 1);
+        let vm::LpcValue::Array(row) = &rows[0] else {
+            panic!("expected row array");
+        };
+        assert!(row.len() >= 3);
+        assert_eq!(row[2].as_int(), Some(5));
+    }
+
+    #[test]
+    fn parse_command_pet_go_pattern() {
+        let program = compiler::compile_source(
+            r#"
+string run() {
+    string tmp1;
+    if (!parse_command("go north", this_object(), " 'move' / 'go' %s ", tmp1))
+        return "nomatch";
+    return tmp1;
+}
+"#,
+            "/test/parse_command",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/parse_command".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "north",
+            "parse_command must capture trailing %s, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn unique_array_groups_by_callback() {
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    return unique_array(({ "a", "bb", "c", "dd" }), (: strlen($1) :));
+}
+"#,
+            "/test/unique_array",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/unique_array".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let vm::LpcValue::Array(groups) = result else {
+            panic!("expected array, got {result:?}");
+        };
+        assert_eq!(groups.len(), 2, "two strlen groups, got {groups:?}");
+    }
+
+    #[test]
+    fn localtime_epoch_is_utc_thursday() {
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    return localtime(0);
+}
+"#,
+            "/test/localtime",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/localtime".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let vm::LpcValue::Array(parts) = result else {
+            panic!("expected array, got {result:?}");
+        };
+        assert_eq!(parts.len(), 10);
+        assert_eq!(parts[3].as_int(), Some(1), "mday");
+        assert_eq!(parts[4].as_int(), Some(0), "January");
+        assert_eq!(parts[5].as_int(), Some(1970), "year");
+        assert_eq!(parts[6].as_int(), Some(4), "Thursday");
+    }
+
+    #[test]
+    fn here_document_string_and_array() {
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    string s;
+    mixed *a;
+    s = @END
+hello
+world
+END
+;
+    a = @@END
+x
+y
+END
+;
+    if (s != "hello\nworld\n") return "str:" + s;
+    if (sizeof(a) != 2) return "len";
+    if (a[0] != "x" || a[1] != "y") return "arr";
+    return "ok";
+}
+"#,
+            "/test/heredoc",
+        )
+        .expect("compile here-document");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/heredoc".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "ok",
+            "here-document, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn get_dir_and_file_size_match_mudos() {
+        let root = std::env::temp_dir().join(format!(
+            "rmudos_get_dir_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("tmpfs/sub")).expect("temp mudlib");
+        std::fs::write(root.join("tmpfs/hello.txt"), b"abc").expect("hello");
+        std::fs::write(root.join("tmpfs/other.c"), b"int x;").expect("other");
+        let program = compiler::compile_source(
+            r#"
+mixed run() {
+    mixed *names;
+    mixed *info;
+    mixed *one;
+    if (file_size("/tmpfs") != -2) return "notdir";
+    if (file_size("/tmpfs/hello.txt") != 3) return "size";
+    if (file_size("/nope") != -1) return "missing";
+    names = get_dir("/tmpfs/");
+    if (sizeof(names) != 3) return "count:" + sizeof(names);
+    if (member_array("hello.txt", names) == -1) return "nohello";
+    if (member_array("sub", names) == -1) return "nosub";
+    info = get_dir("/tmpfs/", -1);
+    if (!pointerp(info[0]) || sizeof(info[0]) != 3) return "badflag";
+    one = get_dir("/tmpfs/hello.txt");
+    if (sizeof(one) != 1 || one[0] != "hello.txt") return "exact";
+    names = get_dir("/tmpfs/*.txt");
+    if (sizeof(names) != 1 || names[0] != "hello.txt") return "glob";
+    write_file("/tmpfs/hello.txt", "abcd");
+    if (file_size("/tmpfs/hello.txt") != 4) return "stale";
+    return "ok";
+}
+"#,
+            "/test/get_dir",
+        )
+        .expect("compile");
+        let world = MudWorld::new(DriverConfig {
+            mudlib: root.clone(),
+            ..Default::default()
+        });
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/get_dir".to_owned(),
+            std::sync::Arc::new(program),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let result = world
+            .apply(object, "run", Vec::new(), None, None)
+            .expect("run");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(
+            result.as_string().unwrap_or("?"),
+            "ok",
+            "MudOS get_dir/file_size, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn message_applies_receive_message() {
+        let player_prog = compiler::compile_source(
+            r#"
+void create() { enable_commands(); }
+
+void receive_message(string msg_class, string msg) {
+    receive("RM:" + msg_class + ":" + msg);
+}
+
+void send_it() {
+    message("info", "%^BOLD%^hi", this_object());
+}
+"#,
+            "/test/color_player",
+        )
+        .expect("compile player");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let player_id = world.allocate_object_id();
+        let player = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            player_id,
+            "/test/color_player".to_owned(),
+            std::sync::Arc::new(player_prog),
+        )));
+        world.objects.write().insert(player_id, player.clone());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        player.lock().interactive = Some(std::sync::Arc::new(vm::object::Interactive::new(
+            "127.0.0.1:21".parse().unwrap(),
+            "rylo",
+            tx,
+        )));
+        world
+            .apply(player.clone(), "create", Vec::new(), None, None)
+            .expect("create");
+        world
+            .apply(player.clone(), "send_it", Vec::new(), Some(player.clone()), None)
+            .expect("message");
+        let out = collect_text(&mut rx);
+        assert!(
+            out.contains("RM:info:%^BOLD%^hi"),
+            "message() must apply receive_message, got: {out}"
+        );
+    }
+
+    #[test]
+    fn terminal_d_ansi_bold_is_escape() {
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let daemon = world
+            .load_object("/daemon/terminal_d")
+            .expect("load TERMINAL_D");
+        let mapping = world
+            .apply(
+                daemon,
+                "query_term_info",
+                vec![vm::LpcValue::String("ansi".into())],
+                None,
+                None,
+            )
+            .expect("query_term_info");
+        let vm::LpcValue::Mapping(map) = mapping else {
+            panic!("expected mapping, got {mapping:?}");
+        };
+        let bold = map
+            .get("BOLD")
+            .and_then(vm::LpcValue::as_string)
+            .unwrap_or("");
+        assert!(
+            bold.starts_with('\u{1b}'),
+            "ansi BOLD should be an ESC sequence, got {bold:?}"
+        );
+        assert!(
+            map.get("GREEN")
+                .and_then(vm::LpcValue::as_string)
+                .is_some_and(|s| s.starts_with('\u{1b}')),
+            "ansi GREEN should be an ESC sequence, got {:?}",
+            map.get("GREEN")
         );
     }
 }

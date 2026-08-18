@@ -15,9 +15,12 @@ void init() {
 }
 
 void reset() {
+  object ob;
   ::reset();
-    if(!present("dhamon")) 
-      new(MON+"barkeep")->move(this_object());
+    if(!present("dhamon")) {
+      if(!catch(ob = new(MON+"barkeep")) && ob)
+        ob->move(this_object());
+    }
 }
 
 void create() {

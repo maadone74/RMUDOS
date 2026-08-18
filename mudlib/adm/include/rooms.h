@@ -2,6 +2,7 @@
 #define ROOM_VOID "/d/standard/void"
 #define ROOM_FREEZER "/d/standard/freezer"
 #define ROOM_SETTER "/d/standard/setter"
+#define ROOM_WAITING "/d/standard/waiting_room"
 #define ROOM_DEATH "/d/standard/death/death_room"
 #define ROOM_IDLE_SHOP "/d/standard/idle_supply"
 #define ROOM_HALL "/d/standard/adv_main"

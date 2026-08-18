@@ -10,5 +10,5 @@ void create() {
     set("short", "South Gates.");
     set("long", "These are the southern gates leading out from Newbieville. To the north is Common Street, which will take you to Town Square if you follow it.");
     add_exit(ROOMS+"commonstreet", "north");
-    add_exit("/d/damned/virtual/room_10_10.world", "plains");
+    /* Virtual overland rooms hang this driver on first load. */
 }

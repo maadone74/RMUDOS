@@ -6,6 +6,8 @@ pub enum TokenKind {
     Number(i64),
     Float(f64),
     String(String),
+    /// MudOS `@@MARKER` here-document: one string per line (no trailing newline).
+    StringArray(Vec<String>),
     /// MudOS functional argument placeholder (`$1`, `$2`, …).
     DollarArg(usize),
     Symbol(String),
@@ -64,6 +66,8 @@ impl<'a> Lexer<'a> {
                 self.string()?
             } else if ch == '\'' {
                 self.char_literal()?
+            } else if ch == '@' {
+                self.here_document()?
             } else if ch == '$' {
                 self.dollar_arg()?
             } else {
@@ -221,6 +225,79 @@ impl<'a> Lexer<'a> {
             bail!("line {}: functional arguments are 1-based ($1, $2, …)", self.line);
         }
         Ok(TokenKind::DollarArg(index))
+    }
+
+    /// MudOS `@MARKER` / `@@MARKER` ... `MARKER` here-documents.
+    /// `@` → one string with `\n` between lines; `@@` → array of line strings.
+    fn here_document(&mut self) -> Result<TokenKind> {
+        let line = self.line;
+        let column = self.column;
+        self.advance(); // '@'
+        let as_array = self.peek(0) == Some('@');
+        if as_array {
+            self.advance();
+        }
+        if !self
+            .peek(0)
+            .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+        {
+            bail!("line {line}, column {column}: expected here-document marker after '@'");
+        }
+        let marker_start = self.offset;
+        while self
+            .peek(0)
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        {
+            self.advance();
+        }
+        let marker: String = self.chars[marker_start..self.offset].iter().collect();
+        while self.peek(0).is_some_and(|ch| ch == ' ' || ch == '\t') {
+            self.advance();
+        }
+        if self.peek(0) == Some('\n') {
+            self.advance();
+        } else if self.peek(0).is_some() {
+            while self.peek(0).is_some_and(|ch| ch != '\n') {
+                self.advance();
+            }
+            if self.peek(0) == Some('\n') {
+                self.advance();
+            }
+        }
+        let mut lines = Vec::new();
+        loop {
+            if self.peek(0).is_none() {
+                bail!(
+                    "line {line}, column {column}: unterminated here-document @{marker}"
+                );
+            }
+            let line_start = self.offset;
+            while self.peek(0).is_some_and(|ch| ch != '\n') {
+                self.advance();
+            }
+            let text: String = self.chars[line_start..self.offset].iter().collect();
+            if text.trim() == marker {
+                if self.peek(0) == Some('\n') {
+                    self.advance();
+                }
+                break;
+            }
+            lines.push(text);
+            if self.peek(0) == Some('\n') {
+                self.advance();
+            } else {
+                bail!(
+                    "line {line}, column {column}: unterminated here-document @{marker}"
+                );
+            }
+        }
+        if as_array {
+            Ok(TokenKind::StringArray(lines))
+        } else if lines.is_empty() {
+            Ok(TokenKind::String(String::new()))
+        } else {
+            Ok(TokenKind::String(format!("{}\n", lines.join("\n"))))
+        }
     }
 
     fn symbol(&mut self) -> Result<TokenKind> {

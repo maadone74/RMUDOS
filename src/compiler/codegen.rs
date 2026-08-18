@@ -788,6 +788,8 @@ impl ExpressionCompiler<'_> {
                     self.code.push(Op::ThisObject);
                 } else if name == "sscanf" && arguments.len() > 2 {
                     self.compile_sscanf(arguments)?;
+                } else if name == "parse_command" && arguments.len() > 3 {
+                    self.compile_parse_command(arguments)?;
                 } else {
                     for argument in arguments {
                         self.compile_expression(argument)?;
@@ -935,6 +937,34 @@ impl ExpressionCompiler<'_> {
         }
         self.code
             .push(Op::CallEfun("sizeof".to_owned(), 1));
+        Ok(())
+    }
+
+    /// MudOS `parse_command(cmd, env, pattern, out...)` — match then store captures.
+    /// `parse_command_values` returns `({ matched, cap... })`; leftover stack value is 0/1.
+    fn compile_parse_command(&mut self, arguments: &[Expr]) -> Result<()> {
+        if arguments.len() < 3 {
+            bail!("parse_command requires command, env, and pattern");
+        }
+        self.compile_expression(&arguments[0])?;
+        self.compile_expression(&arguments[1])?;
+        self.compile_expression(&arguments[2])?;
+        self.code
+            .push(Op::CallEfun("parse_command_values".to_owned(), 3));
+        let outs = &arguments[3..];
+        for (index, target) in outs.iter().enumerate() {
+            if !is_lvalue(target) {
+                bail!("parse_command output argument must be an lvalue");
+            }
+            self.code.push(Op::Dup);
+            self.code
+                .push(Op::Constant(LpcValue::Int((index + 1) as i64)));
+            self.code.push(Op::Index);
+            self.compile_store_lvalue(target)?;
+            self.code.push(Op::Pop);
+        }
+        self.code.push(Op::Constant(LpcValue::Int(0)));
+        self.code.push(Op::Index);
         Ok(())
     }
 

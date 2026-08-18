@@ -25,9 +25,15 @@ void create() {
 string find_cmd(string cmd, string *path) {
     string *tmp;
 
+    if(!cmd || !pointerp(path)) return 0;
     if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
       return sprintf("%s/_%s", tmp[0], cmd);
-    /* Skip on-demand rehash(get_dir): cloud/OneDrive FS can hang the session. */
+    /* Hash any search-path dirs not scanned yet (guild/hm/…). Mortal/skills
+     * were already listed in create(). */
+    tmp = path - (path & __Paths);
+    if(sizeof(tmp)) rehash(tmp);
+    if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
+      return sprintf("%s/_%s", tmp[0], cmd);
     return 0;
   }
 
@@ -39,6 +45,9 @@ void rehash(mixed val) {
     else if(!pointerp(val)) return;
     i = sizeof(val);
     while(i--) {
+        debug_message("CMD_D rehash start " + val[i]);
+        if(this_player())
+            message("info", "Loading commands: " + val[i] + " ...", this_player());
         if(file_size(val[i]) ==-2) //check to see if it's a directory
 		{
 	        j = sizeof(choses = get_dir(val[i]+"/_*.c"));
@@ -47,7 +56,13 @@ void rehash(mixed val) {
 			        if(pointerp(__Cmds[choses[j]])) __Cmds[choses[j]] += ({ val[i] });
 			           else __Cmds[choses[j]] = ({ val[i] });
 			   }
+                debug_message("CMD_D rehash done " + val[i] + " (" +
+                  sizeof(choses) + " cmds)");
 		}
+        else
+            debug_message("CMD_D rehash skip (not a dir) " + val[i]);
+        if(this_player())
+            message("info", "  done " + val[i], this_player());
         __Paths = distinct_array(__Paths + ({ val[i] }));
       }
   }

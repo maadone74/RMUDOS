@@ -48,7 +48,7 @@ this_object()) inv[i]->remove();
 }
 
 void reset() {
-  object bob, *inv;
+  object *inv;
   int i;
 
   ::reset();
@@ -60,15 +60,7 @@ void reset() {
   if(sizeof(inv) > MAX_INV) {
     for(i=MAX_INV-1;i<sizeof(inv);i++) inv[i]->remove();
   }
-  bob = present("shopkeeper", 
-                find_object_or_load("/d/damned/akkad/ak_shop4"));
-
-  if(bob) {
-    message("info", "Jack says in Common: Wait a second.  I've got a new "+
-            "shipment coming in...", environment(bob));
-    call_out("finish_deliver", 4, bob);
-  }
-  clone_once();
+  /* Do not load Akkad shops; skip bulk restock that clones heavy objects. */
   return;
 }
 

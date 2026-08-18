@@ -1,6 +1,12 @@
+#include <rooms.h>
+
 inherit "/std/room";
 
-
+void init() {
+    ::init();
+    if(this_player() && this_player()->is_player())
+	this_player()->set("in creation", 1);
+}
 
 void create() {
 

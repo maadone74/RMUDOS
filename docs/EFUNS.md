@@ -2,6 +2,8 @@
 
 Efuns are built-in functions implemented in Rust (`src/efun/mod.rs`) and callable from LPC. If a name is not an inherited/local function, the compiler emits an efun call.
 
+Gap list vs MudOS / Nightmare `std` + `adm/obj`: [EFUN_GAPS.md](EFUN_GAPS.md).
+
 Argument positions are 1-based in error messages. Unless noted, insufficient arguments error.
 
 ---
@@ -34,7 +36,7 @@ Returns `1`.
 
 ### `message(class, text, target, exclude?)`
 
-Deliver `text` to `target` (object, array, or room path). `class` is accepted for MudOS familiarity but not specially interpreted. Optional exclude list supported.
+Deliver `text` to `target` (object, array, or room path). For each living (or interactive) target, apply `receive_message(class, text)` so mudlib color tokens (`%^BOLD%^`) can be translated. If that apply is missing, write the raw string. Non-living targets send to livings in their inventory. Optional exclude list supported.
 
 Returns `1`.
 

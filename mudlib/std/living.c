@@ -247,13 +247,21 @@ nomask protected int cmd_hook(string cmd) {
 	  this_player());
 	return 1;
     }
-    if(!(file = (string)CMD_D->find_cmd(verb, search_path))) {
-	/* Skip SOUL_D / CHAT_D fallback: first SOUL_D load hangs this driver. */
+    file = 0;
+    debug_message("cmd_hook find_cmd " + verb);
+    if(catch(file = (string)CMD_D->find_cmd(verb, search_path)))
 	return 0;
-    }
+    debug_message("cmd_hook file " + (file ? file : "0"));
+    /* Skip SOUL_D / CHAT_D fallback: first SOUL_D load hangs this driver.
+     * (string)0 must not become "0" and call_other a bogus object. */
+    if(!file || file == "" || file == "0")
+	return 0;
     res = 0;
+    if(!find_object(file))
+	debug_message("cmd_hook compiling " + file);
     if(catch(res = (int)call_other(file, "cmd_"+verb, cmd)))
 	return 0;
+    debug_message("cmd_hook done " + verb);
     return res;
 }
 

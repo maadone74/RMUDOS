@@ -16,10 +16,20 @@ string *argv;
 string list_users(string *races, string order);
 object *master_sort(object *tmp, string order);
 
+void who_display(string text) {
+    string *lines;
+
+    if(!text || text == "") return;
+    lines = explode(text, "\n");
+    if(sizeof(lines) <= 40)
+	write(text);
+    else
+	this_player()->more(lines);
+}
+
 int cmd_who(string str) {
     int j;
     string *args, *races, *other;
-   string *boom;
     string tmp, order;
     string which;
     int i, len;
@@ -60,7 +70,7 @@ int cmd_who(string str) {
     else which = (string)this_player()->query_default_who();
     switch(which) {
     case "normal":
-	this_player()->more(explode(list_users(races, order),"\n"));
+	who_display(list_users(races, order));
 	return 1;
     case "people":
 	if(other && sizeof(other)) {
@@ -72,8 +82,7 @@ int cmd_who(string str) {
     case "short":
 	return cmd_short(order);
     default:
-     boom = explode(list_users(races, order), "\n");
-     this_player()->more(boom);
+	who_display(list_users(races, order));
 	return 1;
     }
     return 1;
@@ -87,10 +96,9 @@ string list_users(string *races, string order) {
 
     who = filter_array(users(), "which_users", this_object(), races);
     total = sizeof(who);
-    if(file_exists("/news/who_header"))
-	who_list = read_file("/news/who_header");
-    else
-	who_list = "ERROR: No who_header found\n\n";
+    /* Skip /news/who_header: read_file → master->valid_read can hang
+     * the first who even after CMD_D is loaded. */
+    who_list = "Daybreak Ridge\n";
     if(total == 1 && sizeof(users()) == 1)
         who_list += "There beats but one heart in Daybreak Ridge!\n";
     else

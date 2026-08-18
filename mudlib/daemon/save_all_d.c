@@ -27,7 +27,7 @@ void add_crash_items(object player, int flag){
     object *inv;
     object a;
     int i;
-    string tmp, file, *inv2;
+    string tmp, file;
     string letter, save_dir, name;
 
     name=player->query_true_name();
@@ -40,9 +40,8 @@ void add_crash_items(object player, int flag){
     mkdir(save_dir);
    
     save_dir += "/";
-    inv2 = get_dir(save_dir+name+"_*"); 
-    for (i=0;i<sizeof(inv2);i++){
-//        file = save_dir+name+"_*"+inv2[i];
+    /* Do not get_dir here: directory listing can freeze the eval lock. */
+    for (i=0;i<32;i++){
        file = save_dir+name+"_"+i+".o";
         rm(file);
     }
@@ -79,7 +78,9 @@ void restore_crash_items(object player){
     letter = explode(name, "")[0];
     save_dir = "/adm/save/objects/saveall/"+letter+"/"+name;
 
-    inv = get_dir(save_dir+"/"+name+"_*");
+    inv = ({});
+    catch(inv = get_dir(save_dir+"/"+name+"_*"));
+    if(!pointerp(inv)) inv = ({});
     for (i=0;i<sizeof(inv);i++){
         file = save_dir+"/"+inv[i];
         obj = replace_string(read_file(file, 1, 1), "#", "");
