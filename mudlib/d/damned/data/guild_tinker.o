@@ -1,0 +1,23 @@
+encumbrance 0
+props (["light":2,"indoors":1,"base hp regen":7,"base mp regen":2,"hp advance":40,"mp advance":8,"guild mods":(["strength":15,"constitution":5])])
+true_name 0
+creator 0
+material 0
+possible_to_close 0
+is_closed 0
+max_internal_encumbrance 0
+__Search_Obj 0
+__Smells ([])
+__Listens ([])
+__Searches ([])
+skip_obvious 0
+destinations (["west":"//d/damned/guilds/tinker/tinker_shop","up":"//d/damned/guilds/tinker/train_room","east":"//d/damned/akkad/ak_sd4"])
+invis_exits ([])
+pre_exit_func (["west":"class_check"])
+post_exit_func ([])
+tracks ({})
+__Items (["sky":0,"sun":0,"moon":0,"moons":0,"warzau":0,"ankh":0,"luna":0,"red moon":0,"blue moon":0,"green moon":0,"staircase":"It is crafted out of iron and looks very proffesionally done.","things":"There is a sign nearby that says 'Look with your eyes not your hands.' Shucks."])
+reset_number 0
+guild_list (["rylo":(["status":"member"])])
+banish ([])
+master 0

@@ -12,6 +12,19 @@ void do_help();
 
 void create() { __More = ([]); }
 
+int more_screen_size() {
+    mixed lines;
+    int scr;
+
+    lines = this_object()->getenv("LINES");
+    /* (string)0 stays 0 on this driver; atoi of that must not error. */
+    if(intp(lines) && lines > 1) scr = lines;
+    else if(stringp(lines)) scr = atoi(lines);
+    else scr = 0;
+    if(scr < 2) scr = 20;
+    return scr;
+}
+
 varargs int more(mixed what, string cl, function endmore) {
     string *tmp;
 
@@ -19,9 +32,7 @@ varargs int more(mixed what, string cl, function endmore) {
       return notify_fail("Unknown file reference.\n");
     if(__More["lines"]) return notify_fail("You are in more now.\n");
     if(!(__More["class"] = cl)) __More["class"] = "info";
-    if(!(__More["screen"]=atoi((string)this_object()->getenv("LINES")))
-      || __More["screen"] < 1)
-      __More["screen"] = 20;
+    __More["screen"] = more_screen_size();
     if(stringp(what)) {
         if(sizeof(tmp = (string *)this_object()->wild_card(what)) != 1)
           return notify_fail("Ambiguous file reference.\n");
@@ -46,10 +57,10 @@ varargs int more(mixed what, string cl, function endmore) {
     return 1;
 }
 
-protected void do_more(string cmd) {
+void do_more(string cmd) {
     string arg;
     string *matches;
-    int i;
+    int i, pct;
 
     if(!cmd || cmd == "") cmd = " ";
     if((i=strlen(cmd)) > 1) arg = cmd[1..(i-1)];
@@ -127,7 +138,8 @@ protected void do_more(string cmd) {
           __More = ([]);
           return;
         }
-        message(__More["class"], __More["lines"][i], this_object());
+        /* N-prefix skips wrap() so each pager row is one terminal line. */
+        message("N"+__More["class"], __More["lines"][i]+"\n", this_object());
     }
     if((__More["current"] = i) >= __More["total"]) {
         if(functionp(__More["endfun"])) (*__More["endfun"])();
@@ -135,7 +147,11 @@ protected void do_more(string cmd) {
         return;
     }
     __More["current"] = i;
-    write("--More-- ("+to_int(percent(__More["current"], __More["total"]))+"%) ");
+    if(__More["total"] > 0)
+      pct = __More["current"] * 100 / __More["total"];
+    else pct = 100;
+    /* prompt class is not wrapped; stays visible as the pager wait line. */
+    message("prompt", "--More-- ("+pct+"%) ", this_object());
     input_to("do_more");
     return;
 }

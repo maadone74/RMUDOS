@@ -34,9 +34,9 @@ void create() {
       "the clearing.  Exit into the forest is impossible, but trails "+
       "cut pathways through the forest out of the clearing."
     );
-    add_exit("trail1","east");
-    add_exit("trail3","west");
-    add_exit("trail0","south");
+    add_exit("/d/khojem/new/room/trail1","east");
+    add_exit("/d/khojem/new/room/trail3","west");
+    add_exit("/d/khojem/new/room/trail0","south");
     set_items(([
         "sign" : "The sign points to the west.\n"+
           "Maybe you should try to read it?",
@@ -53,9 +53,10 @@ void create() {
     set_smell("default", "The smell of rotting corpses is very strong.");
     set_listen("default", "You hear a battle raging.");
     set_search("default",(: this_object(),"do_search" :));
-    new("/wizards/khojem/new/mon/elf_warrior")->move(this_object());
-    new("/wizards/khojem/new/mon/orc_warrior")->move(this_object());
-    new("/wizards/khojem/new/obj/sign")->move(this_object());
+    /* Area files live under /d/khojem; /wizards/khojem is gone in this tree. */
+    catch(new("/d/khojem/new/mon/elf_warrior")->move(this_object()));
+    catch(new("/d/khojem/new/mon/orc_warrior")->move(this_object()));
+    catch(new("/d/khojem/new/obj/sign")->move(this_object()));
 }
 
 int read_sign(string str){

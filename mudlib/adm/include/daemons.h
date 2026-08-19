@@ -56,5 +56,6 @@
 #define VOTING_D             (DIR_DAEMONS+"/voting")
 #define VOTE      (DIR_DAEMONS+"/voter")
 #define TELL_CLEAN_D            (DIR_DAEMONS+"/tell_clean_d")
+#define WIZCHAR_D            (DIR_SECURE_DAEMONS+"/wizchar_d")
 
 #endif /* __DAEMONS_H */

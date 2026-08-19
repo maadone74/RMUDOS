@@ -17,7 +17,7 @@ void reset() {
 object forge;
 ::reset();
 if(!present("forge")) {
-forge = new("/wizards/azura1/greater_forge");
+forge = new("/std/diewarzau/obj/misc/greater_forge.c");
         forge->set_weight(100000000);
         forge->move(this_object());
 }

@@ -93,6 +93,12 @@ fn compile_recursive(
     Ok(program)
 }
 
+/// MudOS source path is `{object_path}.c` (append, do not replace a virtual
+/// suffix like `.armour` / `.weapon`).
+fn lpc_source_path(root: &Path, object_path: &str) -> PathBuf {
+    root.join(format!("{}.c", object_path.trim_start_matches('/')))
+}
+
 fn object_file(root: &Path, object_path: &str) -> Result<PathBuf> {
     let relative = object_path.trim_start_matches('/');
     let path = Path::new(relative);
@@ -102,7 +108,17 @@ fn object_file(root: &Path, object_path: &str) -> Result<PathBuf> {
     {
         bail!("invalid LPC object path {object_path:?}");
     }
-    Ok(root.join(path).with_extension("c"))
+    let primary = lpc_source_path(root, object_path);
+    if primary.is_file() {
+        return Ok(primary);
+    }
+    if let Some(alt_path) = crate::config::wizard_to_domain_path(object_path) {
+        let alt = lpc_source_path(root, &alt_path);
+        if alt.is_file() {
+            return Ok(alt);
+        }
+    }
+    Ok(primary)
 }
 
 fn resolve_inherit(current: &str, inherit: &str) -> Result<String> {

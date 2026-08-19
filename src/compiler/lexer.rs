@@ -276,10 +276,10 @@ impl<'a> Lexer<'a> {
                 self.advance();
             }
             let text: String = self.chars[line_start..self.offset].iter().collect();
-            if text.trim() == marker {
-                if self.peek(0) == Some('\n') {
-                    self.advance();
-                }
+            if let Some(after_marker) = here_doc_end_offset(&text, &marker) {
+                // Leave any trailer (`);`) for the main lexer.
+                self.offset = line_start + after_marker;
+                self.column = after_marker + 1;
                 break;
             }
             lines.push(text);
@@ -356,5 +356,21 @@ impl<'a> Lexer<'a> {
             self.column += 1;
         }
         Some(ch)
+    }
+}
+
+/// Offset in `line` just after the marker when this line ends the here-doc.
+/// Trailer may be `);` so `write(@EndText ... EndText);` still parses.
+fn here_doc_end_offset(line: &str, marker: &str) -> Option<usize> {
+    let start = line.len() - line.trim_start().len();
+    let trimmed = &line[start..];
+    if !trimmed.starts_with(marker) {
+        return None;
+    }
+    let after = &trimmed[marker.len()..];
+    if after.is_empty() || after.chars().all(|ch| matches!(ch, ')' | ';' | ' ' | '\t')) {
+        Some(start + marker.len())
+    } else {
+        None
     }
 }

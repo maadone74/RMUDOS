@@ -106,9 +106,9 @@ async fn handle_connection(
 
     while let Some(line) = line_rx.recv().await {
         let Some(player) = find_interactive_owner(&world, &interactive) else {
-            // Interactive may briefly be unowned across exec(); wait for next line.
-            tracing::warn!("no interactive owner for connection; dropping line");
-            continue;
+            // `exec()` reattaches before this loop runs again. None means
+            // quit/destruct — keep waiting and the telnet session hangs.
+            break;
         };
         if player.lock().destructed {
             break;
@@ -135,6 +135,10 @@ async fn handle_connection(
                 tracing::warn!(error = format!("{e:#}"), "process_input join failed");
             }
         }
+        // `quit` destructs the player; do not wait for another line.
+        if find_interactive_owner(&world, &interactive).is_none() {
+            break;
+        }
     }
 
     if let Some(player) = find_interactive_owner(&world, &interactive) {
@@ -142,6 +146,7 @@ async fn handle_connection(
         player.lock().interactive = None;
         let _ = simulate::destruct_object(&world, player);
     }
+    drop(interactive);
     let _ = tokio::time::timeout(std::time::Duration::from_millis(250), io).await;
     Ok(())
 }

@@ -13,7 +13,7 @@ pub use value::LpcValue;
 use crate::compiler;
 use crate::config::{normalize_object_path, DriverConfig};
 use crate::efun::EfunTable;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use call_out::CallOutQueue;
 use fs_cache::FsCache;
 use indexmap::IndexMap;
@@ -43,6 +43,8 @@ pub struct MudWorld {
     pub(crate) started: Instant,
     /// Stat / `get_dir` cache (MudOS-style; invalidated by write/rm/mkdir/…).
     pub(crate) fs_cache: FsCache,
+    /// Blueprint paths currently running `create()` (reentrant `load_object` must return these).
+    pub(crate) creating: RwLock<HashMap<String, ORef>>,
 }
 
 impl MudWorld {
@@ -62,6 +64,7 @@ impl MudWorld {
             eval_lock: Mutex::new(()),
             started: Instant::now(),
             fs_cache: FsCache::new(),
+            creating: RwLock::new(HashMap::new()),
         }
     }
 
@@ -239,61 +242,30 @@ impl MudWorld {
         if let Some(existing) = self.find_object(&path) {
             return Ok(existing);
         }
+        if let Some(partial) = self.creating.read().get(&path) {
+            return Ok(partial.clone());
+        }
         tracing::info!(%path, "load_object start");
+        if !compiler::source_exists(&self.config.mudlib, &path) {
+            return self.try_virtual_compile(&path);
+        }
         let compile_started = Instant::now();
-        let program = match compiler::compile_file_in(&self.config.mudlib, &path) {
-            Ok(program) => {
-                tracing::info!(
-                    %path,
-                    elapsed_ms = compile_started.elapsed().as_millis(),
-                    "load_object compile ok"
-                );
-                program
-            }
-            Err(compile_error) => {
-                tracing::warn!(
-                    %path,
-                    error = %format!("{compile_error:#}"),
-                    "load_object compile failed"
-                );
-                // MudOS compile_object is only for missing source, not compile errors.
-                if compiler::source_exists(&self.config.mudlib, &path) {
-                    return Err(compile_error).with_context(|| format!("compile {path}"));
-                }
-                if let Some(master) = self.master() {
-                    tracing::info!(%path, "load_object trying master compile_object");
-                    match self.apply(
-                        master,
-                        "compile_object",
-                        vec![value::LpcValue::String(path.clone())],
-                        None,
-                        None,
-                    ) {
-                        Ok(value::LpcValue::Object(object)) => {
-                            tracing::info!(%path, "load_object virtual ok");
-                            return Ok(object);
-                        }
-                        Ok(value::LpcValue::String(resolved)) => {
-                            return self.load_object(&resolved);
-                        }
-                        other => {
-                            tracing::warn!(
-                                %path,
-                                result = %format!("{other:?}"),
-                                "load_object compile_object did not return an object"
-                            );
-                        }
-                    }
-                }
-                return Err(compile_error).with_context(|| format!("compile {path}"));
-            }
-        };
+        let program = compiler::compile_file_in(&self.config.mudlib, &path)
+            .with_context(|| format!("compile {path}"))?;
+        tracing::info!(
+            %path,
+            elapsed_ms = compile_started.elapsed().as_millis(),
+            "load_object compile ok"
+        );
         let id = self.allocate_object_id();
         let object = Arc::new(Mutex::new(ObjectStruct::new(id, path.clone(), program)));
+        self.creating.write().insert(path.clone(), object.clone());
         self.objects.write().insert(id, object.clone());
         self.blueprints.write().insert(path.clone(), id);
         tracing::info!(%path, "load_object create()");
-        if let Err(err) = self.apply(object.clone(), "create", Vec::new(), None, None) {
+        let create_result = self.apply(object.clone(), "create", Vec::new(), None, None);
+        self.creating.write().remove(&path);
+        if let Err(err) = create_result {
             self.objects.write().shift_remove(&id);
             self.blueprints.write().remove(&path);
             return Err(err).with_context(|| format!("create() in {path}"));
@@ -303,7 +275,51 @@ impl MudWorld {
     }
 
     pub fn clone_object(&self, path: &str) -> Result<ORef> {
+        self.clone_object_from(path, None)
+    }
+
+    /// MudOS: `clone_object` of a path with no `.c` calls `master->compile_object`.
+    /// The returned object is already the instance (virtual server clones itself).
+    fn try_virtual_compile(&self, path: &str) -> Result<ORef> {
+        let Some(master) = self.master() else {
+            bail!("no master object for virtual compile of {path}");
+        };
+        tracing::info!(%path, "trying master compile_object");
+        match self.apply(
+            master,
+            "compile_object",
+            vec![value::LpcValue::String(path.to_owned())],
+            None,
+            None,
+        ) {
+            Ok(value::LpcValue::Object(object)) => {
+                let id = {
+                    let mut guard = object.lock();
+                    guard.name = path.to_owned();
+                    guard.id
+                };
+                self.blueprints.write().insert(path.to_owned(), id);
+                tracing::info!(%path, "virtual compile_object ok");
+                Ok(object)
+            }
+            Ok(value::LpcValue::String(resolved)) => self.load_object(&resolved),
+            other => {
+                tracing::warn!(
+                    %path,
+                    result = %format!("{other:?}"),
+                    "compile_object did not return an object"
+                );
+                bail!("compile_object did not return an object for {path}: {other:?}")
+            }
+        }
+    }
+
+    /// MudOS: `previous_object()` during clone `create()` is the caller.
+    pub fn clone_object_from(&self, path: &str, previous: Option<ORef>) -> Result<ORef> {
         let path = normalize_object_path(path);
+        if !compiler::source_exists(&self.config.mudlib, &path) {
+            return self.try_virtual_compile(&path);
+        }
         let program = compiler::compile_file_in(&self.config.mudlib, &path)?;
         let id = self.allocate_object_id();
         let clone_number = self.allocate_clone_id();
@@ -311,7 +327,7 @@ impl MudWorld {
         object.clone_number = Some(clone_number);
         let object = Arc::new(Mutex::new(object));
         self.objects.write().insert(id, object.clone());
-        self.apply(object.clone(), "create", Vec::new(), None, None)
+        self.apply(object.clone(), "create", Vec::new(), None, previous)
             .with_context(|| format!("create() in clone of {path}"))?;
         Ok(object)
     }
@@ -322,7 +338,7 @@ impl MudWorld {
             let mut livings = self.livings.write();
             livings.retain(|_, living| !Arc::ptr_eq(living, object));
         }
-        let id = {
+        let (id, old_shadow, old_shadowed) = {
             let mut g = object.lock();
             if g.destructed {
                 return Ok(());
@@ -330,6 +346,8 @@ impl MudWorld {
             g.destructed = true;
             g.interactive = None;
             g.pending_input = None;
+            let old_shadow = g.shadow.take();
+            let old_shadowed = g.shadowed.take();
             if let Some(env) = g.environment.take().and_then(|w| w.upgrade()) {
                 let oid = g.id;
                 env.lock().inventory.retain(|item| {
@@ -347,13 +365,27 @@ impl MudWorld {
             if blueprints.get(&name).copied() == Some(id) {
                 blueprints.remove(&name);
             }
-            id
+            (id, old_shadow, old_shadowed)
         };
+        if let Some(shadow) = old_shadow {
+            shadow.lock().shadowed = None;
+        }
+        if let Some(target) = old_shadowed.and_then(|weak| weak.upgrade()) {
+            let mut target = target.lock();
+            if target
+                .shadow
+                .as_ref()
+                .is_some_and(|shadow| Arc::ptr_eq(shadow, object))
+            {
+                target.shadow = None;
+            }
+        }
         self.objects.write().shift_remove(&id);
         Ok(())
     }
 
     pub fn move_object(&self, object: &ORef, destination: &ORef) -> Result<()> {
+        let old_env = object.lock().environment();
         {
             let mut g = object.lock();
             let oid = g.id;
@@ -365,45 +397,69 @@ impl MudWorld {
                 });
             }
             g.environment = Some(Arc::downgrade(destination));
+            g.move_count = g.move_count.saturating_add(1);
         }
         destination.lock().inventory.push(object.clone());
-        // MudOS: drop sentences from objects no longer nearby, then re-init.
-        self.prune_stale_actions(object);
-        // MudOS: room/object init during a move sees the moving object as this_player.
-        if let Err(error) = self.apply(
-            destination.clone(),
-            "init",
-            Vec::new(),
-            Some(object.clone()),
-            Some(object.clone()),
-        ) {
-            tracing::warn!(
-                error = %format!("{error:#}"),
-                dest = %destination.lock().name,
-                "destination init() failed"
-            );
-        }
-        let inventory = destination.lock().inventory.clone();
-        for item in inventory {
-            if Arc::ptr_eq(&item, object) || item.lock().destructed {
-                continue;
+        if Self::object_is_living(object) {
+            // Living enters dest: this_player is the mover.
+            self.prune_stale_actions(object);
+            self.call_init(destination, object);
+            let inventory = destination.lock().inventory.clone();
+            for item in inventory {
+                if Arc::ptr_eq(&item, object) || item.lock().destructed {
+                    continue;
+                }
+                self.call_init(&item, object);
             }
-            let _ = self.apply(
-                item,
-                "init",
-                Vec::new(),
-                Some(object.clone()),
-                Some(object.clone()),
-            );
+            self.call_init(object, object);
+        } else {
+            // Item moved: init the item for each living that can now see it
+            // (inventory dest, or livings in a room). Do not treat the item as
+            // this_player — that stored add_action on the object, not the player.
+            if let Some(old) = old_env {
+                for living in Self::livings_here(&old) {
+                    self.prune_stale_actions(&living);
+                }
+            }
+            for living in Self::livings_here(destination) {
+                self.call_init(object, &living);
+            }
         }
-        let _ = self.apply(
+        Ok(())
+    }
+
+    fn object_is_living(object: &ORef) -> bool {
+        let guard = object.lock();
+        !guard.destructed && (guard.commands_enabled || guard.living_name.is_some())
+    }
+
+    fn livings_here(place: &ORef) -> Vec<ORef> {
+        let mut out = Vec::new();
+        if Self::object_is_living(place) {
+            out.push(place.clone());
+        }
+        for item in place.lock().inventory.clone() {
+            if Self::object_is_living(&item) {
+                out.push(item);
+            }
+        }
+        out
+    }
+
+    fn call_init(&self, object: &ORef, this_player: &ORef) {
+        if let Err(error) = self.apply(
             object.clone(),
             "init",
             Vec::new(),
-            Some(object.clone()),
-            Some(object.clone()),
-        );
-        Ok(())
+            Some(this_player.clone()),
+            Some(this_player.clone()),
+        ) {
+            tracing::warn!(
+                error = %format!("{error:#}"),
+                path = %object.lock().name,
+                "init() failed"
+            );
+        }
     }
 
     /// Remove `add_action` sentences whose owner is no longer near the living.
@@ -541,6 +597,43 @@ impl MudWorld {
         line: String,
         run_process_input: bool,
     ) -> Result<value::LpcValue> {
+        let result = self.handle_player_input_core(player.clone(), line, run_process_input);
+        if run_process_input {
+            self.maybe_write_prompt(&player);
+        }
+        result
+    }
+
+    /// MudOS: after a typed line, apply `write_prompt` unless `input_to` is pending
+    /// (pager, password, editor). `command()` does not reprint the prompt.
+    fn maybe_write_prompt(&self, player: &ORef) {
+        if player.lock().destructed || player.lock().pending_input.is_some() {
+            return;
+        }
+        let has_prompt = {
+            let program = player.lock().program.clone();
+            Interpreter::find_function(&program, "write_prompt").is_some()
+        };
+        if !has_prompt {
+            return;
+        }
+        if let Err(error) = self.apply(
+            player.clone(),
+            "write_prompt",
+            Vec::new(),
+            Some(player.clone()),
+            None,
+        ) {
+            tracing::debug!(error = %format!("{error:#}"), "write_prompt failed");
+        }
+    }
+
+    fn handle_player_input_core(
+        &self,
+        player: ORef,
+        line: String,
+        run_process_input: bool,
+    ) -> Result<value::LpcValue> {
         // `command()` must not steal `input_to` callbacks (MudOS); only typed input does.
         if run_process_input {
             let pending = player.lock().pending_input.take();
@@ -601,20 +694,26 @@ impl MudWorld {
             return Ok(value::LpcValue::Int(1));
         }
 
+        tracing::info!(command = %trimmed, "player command start");
+
         {
             let mut guard = player.lock();
             guard.last_verb = None;
             guard.notify_fail = None;
         }
 
-        if self.try_command(&player, &trimmed)? {
+        let handled = self.try_command(&player, &trimmed)?;
+        tracing::info!(command = %trimmed, handled, "player command done");
+
+        if handled {
             return Ok(value::LpcValue::Int(1));
         }
 
-        if let Some(fail) = player.lock().notify_fail.take() {
-            player.lock().write(fail);
+        let mut guard = player.lock();
+        if let Some(fail) = guard.notify_fail.take() {
+            guard.write(fail);
         } else {
-            player.lock().write("What?\n".to_owned());
+            guard.write("What?\n".to_owned());
         }
         Ok(value::LpcValue::Int(0))
     }

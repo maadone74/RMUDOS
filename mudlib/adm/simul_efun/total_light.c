@@ -16,13 +16,18 @@ int total_light(object who) {
     light = (int)env->query_property("light");
     while(i--) light += (int)inv[i]->query_property("light");
     if(env->query_property("indoors")) return light;
-    switch( (string)EVENTS_D->query_time_of_day() ) {
+    {
+    string tod;
+    tod = "day";
+    catch(tod = (string)EVENTS_D->query_time_of_day());
+    switch(tod) {
         case "dawn": return --light;
         case "day": return light;
         case "twilight": return --light;
         case "night":
           return ((light-4)+((int)ASTRONOMY_D->query_moon_light()) +
             ((int)env->query_property("night light")));
+    }
     }
     return light;
 }

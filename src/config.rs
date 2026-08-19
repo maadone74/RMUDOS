@@ -157,3 +157,10 @@ pub(crate) fn normalize_object_path(path: &str) -> String {
     }
     path
 }
+
+/// Darke LPC still names `/wizards/<name>/...` after areas moved to `/d/<name>/`.
+pub(crate) fn wizard_to_domain_path(lpc_path: &str) -> Option<String> {
+    let relative = lpc_path.trim_start_matches('/');
+    let rest = relative.strip_prefix("wizards/")?;
+    Some(format!("/d/{rest}"))
+}

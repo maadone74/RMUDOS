@@ -9,7 +9,6 @@ inherit "/std/guilds/join_room";
 // }
 
 void create() {
-  object ob;
   set_class_name("tinker");
 
   ::create();
@@ -97,27 +96,8 @@ TEXT
    "%^BLUE%^=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=%^RESET%^\n",
     ]));
 
-  ob = new("std/bboard");
-  ob->set_name("book");
-  ob->set_id( ({"book", "tinker book", "work order book"}) );
-  ob->set_board_id("tinker_book");
-  ob->set_max_posts(50);
-  ob->set_edit_ok( ({"/d/damned/guilds/join_rooms/tinker_join"->query_all_members() }) );
-  ob->set_location("d/damned/guilds/join_rooms/tinker_join");
-  ob->set("short","Work Order Book");
-  ob->set("long",@TEXT%^BLUE%^
--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-%^RESET%^
-This ledger contains all the work requests and work-in-progress annotations
-requarding projects, jobs, or customer service.
-
-Customers should feel free to post a work request according to guidelines
-set forth in the INSTRUCTIONS entry.  Information reguarding what services
-are provided and prices can be found in the CATALOG entry.%^BLUE%^
--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-%^RESET%^
-
-TEXT
-);
-  new("d/damned/guilds/join_rooms/tcan")->move(this_object());
+  /* /std/bboard + BBOARD_D on first clone can hang on cloud-synced board saves. */
+  catch(new("/d/damned/guilds/join_rooms/tcan")->move(this_object()));
   set_exits( ([
     "east" : "/d/daybreak/room/dbcc7",
     "up" : "/d/damned/guilds/tinker/train_room",
@@ -139,7 +119,7 @@ TEXT
   //  Stat mods received upon joining.
 
   //  The following line is necessary:
-  this_object()->reset();
+  catch(this_object()->reset());
   return;
 }
 int class_check(){

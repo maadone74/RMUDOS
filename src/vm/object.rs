@@ -94,6 +94,12 @@ pub struct Object {
     pub snoop_target: Option<ObjectRef>,
     /// MudOS `in_edit` — non-empty while `ed()` session is active.
     pub editing_file: Option<String>,
+    /// Times this object has been `move_object`'d (author/domain stats `"moves"`).
+    pub move_count: i64,
+    /// Cached `master->author_file(file_name)` result.
+    pub author: Option<String>,
+    /// Cached `master->domain_file(file_name)` result.
+    pub domain: Option<String>,
 }
 
 impl Object {
@@ -134,6 +140,9 @@ impl Object {
             snooper: None,
             snoop_target: None,
             editing_file: None,
+            move_count: 0,
+            author: None,
+            domain: None,
         }
     }
 

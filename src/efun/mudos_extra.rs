@@ -1,6 +1,6 @@
 //! Additional MudOS-oriented efuns (filesystem, call_out, commands, login helpers).
 
-use crate::config::normalize_object_path;
+use crate::config::{normalize_object_path, wizard_to_domain_path};
 use crate::vm::interpret::Interpreter;
 use crate::vm::object::{Action, ObjectRef};
 use crate::vm::program::Program;
@@ -25,6 +25,7 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("get_dir", get_dir);
     functions.insert("mkdir", mkdir_efun);
     functions.insert("rm", rm_efun);
+    functions.insert("rmdir", rmdir_efun);
     functions.insert("cp", cp_efun);
     functions.insert("rename", rename_efun);
     functions.insert("read_database", read_database);
@@ -101,11 +102,24 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("query_snooping", query_snooping);
     functions.insert("inherits", inherits_efun);
     functions.insert("deep_inherit_list", deep_inherit_list);
+    functions.insert("inherit_list", inherit_list_efun);
     functions.insert("call_out_info", call_out_info);
     functions.insert("stat", stat_efun);
     functions.insert("ed", ed_efun);
     functions.insert("in_edit", in_edit);
     functions.insert("in_input", in_input);
+    functions.insert("repeat_string", repeat_string);
+    functions.insert("tail", tail_efun);
+    functions.insert("read_bytes", read_bytes);
+    functions.insert("rusage", rusage_efun);
+    functions.insert("debug_info", debug_info);
+    functions.insert("dumpallobj", dumpallobj);
+    functions.insert("dump_file_descriptors", dump_file_descriptors);
+    functions.insert("cache_stats", cache_stats);
+    functions.insert("malloc_status", malloc_status);
+    functions.insert("mud_status", mud_status);
+    functions.insert("author_stats", author_stats);
+    functions.insert("domain_stats", domain_stats);
     // Socket efuns: stubs until real MudOS sockets are implemented.
     // Network daemons call these from call_out("setup"); returning EESOCKET
     // lets them soft-fail instead of aborting with "unknown efun".
@@ -151,6 +165,19 @@ fn resolve_mudlib_path(interpreter: &Interpreter<'_>, path: &str) -> Result<Path
     // Component walking above already keeps the path under mudlib.
     if !resolved.starts_with(&mudlib) {
         bail!("path escapes mudlib root");
+    }
+    if !resolved.exists() {
+        if let Some(alt_path) = wizard_to_domain_path(&format!("/{relative}")) {
+            let mut alt = mudlib.clone();
+            for component in Path::new(alt_path.trim_start_matches('/')).components() {
+                if let Component::Normal(part) = component {
+                    alt.push(part);
+                }
+            }
+            if alt.exists() && alt.starts_with(&mudlib) {
+                return Ok(alt);
+            }
+        }
     }
     Ok(resolved)
 }
@@ -264,6 +291,69 @@ fn read_file(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Res
         }
         Err(_) => Ok(LpcValue::Null),
     }
+}
+
+fn read_bytes(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "read_bytes")?;
+    let path = arguments[0]
+        .as_string()
+        .context("read_bytes requires a path")?;
+    check_valid_access(interpreter, path, "read_bytes", false)?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let Ok(bytes) = fs::read(&resolved) else {
+        return Ok(LpcValue::Null);
+    };
+    let start = arguments.get(1).and_then(LpcValue::as_int).unwrap_or(0).max(0) as usize;
+    if start >= bytes.len() {
+        return Ok(LpcValue::String(String::new()));
+    }
+    let len = arguments
+        .get(2)
+        .and_then(LpcValue::as_int)
+        .map(|n| n.max(0) as usize)
+        .unwrap_or(bytes.len() - start);
+    let end = (start + len).min(bytes.len());
+    Ok(LpcValue::String(String::from_utf8_lossy(&bytes[start..end]).into_owned()))
+}
+
+fn repeat_string(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "repeat_string")?;
+    let piece = arguments[0].to_string();
+    let times = arguments[1].as_int().unwrap_or(0).max(0) as usize;
+    if piece.is_empty() || times == 0 {
+        return Ok(LpcValue::String(String::new()));
+    }
+    let cap = 1_000_000usize;
+    let total = piece.len().saturating_mul(times).min(cap);
+    let n = if piece.is_empty() {
+        0
+    } else {
+        total / piece.len()
+    };
+    Ok(LpcValue::String(piece.repeat(n)))
+}
+
+fn tail_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "tail")?;
+    let path = arguments[0].as_string().context("tail requires a path")?;
+    check_valid_access(interpreter, path, "tail", false)?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let Ok(contents) = fs::read_to_string(&resolved) else {
+        return Ok(LpcValue::Int(0));
+    };
+    let lines: Vec<&str> = contents.lines().collect();
+    let start = lines.len().saturating_sub(20);
+    let text = if start < lines.len() {
+        format!("{}\n", lines[start..].join("\n"))
+    } else {
+        String::new()
+    };
+    let recipient = interpreter
+        .this_player
+        .clone()
+        .unwrap_or_else(|| interpreter.current_object.clone());
+    recipient.lock().write(text);
+    Ok(LpcValue::Int(1))
 }
 
 fn write_file(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -440,8 +530,26 @@ enum GetDirQuery {
 /// a bare directory path lists it; a bare file path returns that name.
 fn parse_get_dir_query(path: &str) -> GetDirQuery {
     let path = if path.is_empty() { "/" } else { path };
+    let trimmed = path.trim_end_matches('/');
+    let (dir, name) = match trimmed.rsplit_once('/') {
+        Some(("", name)) => ("/", name),
+        Some((dir, name)) => (dir, name),
+        None => ("/", trimmed.trim_start_matches('/')),
+    };
+    // Trailing `/` from resolv_path must not hide a glob in the last component
+    // (`/std/*/` is a listing of `/std`, not a directory named `*`).
+    if name.contains('*') || name.contains('?') {
+        return GetDirQuery::List {
+            dir: if dir.is_empty() {
+                "/".to_owned()
+            } else {
+                dir.to_owned()
+            },
+            pattern: Some(name.to_owned()),
+        };
+    }
     if path.ends_with('/') {
-        let dir = path.trim_end_matches('/');
+        let dir = trimmed;
         return GetDirQuery::List {
             dir: if dir.is_empty() {
                 "/".to_owned()
@@ -451,15 +559,10 @@ fn parse_get_dir_query(path: &str) -> GetDirQuery {
             pattern: None,
         };
     }
-    let (dir, name) = match path.rsplit_once('/') {
-        Some(("", name)) => ("/", name),
-        Some((dir, name)) => (dir, name),
-        None => ("/", path.trim_start_matches('/')),
-    };
-    if name.contains('*') || name.contains('?') {
+    if trimmed == "/" || name.is_empty() {
         GetDirQuery::List {
-            dir: dir.to_owned(),
-            pattern: Some(name.to_owned()),
+            dir: "/".to_owned(),
+            pattern: None,
         }
     } else {
         GetDirQuery::File {
@@ -534,6 +637,18 @@ fn rm_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resul
     } else {
         fs::remove_file(&resolved).is_ok()
     };
+    if ok {
+        interpreter.world.fs_cache.invalidate(&resolved);
+    }
+    Ok(LpcValue::Int(i64::from(ok)))
+}
+
+fn rmdir_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "rmdir")?;
+    let path = arguments[0].as_string().context("rmdir requires a path")?;
+    check_valid_access(interpreter, path, "rmdir", true)?;
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    let ok = fs::remove_dir(&resolved).is_ok();
     if ok {
         interpreter.world.fs_cache.invalidate(&resolved);
     }
@@ -910,8 +1025,36 @@ fn ctime(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0)
         });
-    // Simple UTC formatting without chrono dependency.
-    Ok(LpcValue::String(format!("ctime({seconds})")))
+    Ok(LpcValue::String(format_ctime_utc(seconds)))
+}
+
+/// MudOS `ctime()`: `asctime`-shaped UTC (`"Thu Jan  1 00:00:00 1970"`).
+fn format_ctime_utc(unix_seconds: i64) -> String {
+    const WEEKDAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let z = unix_seconds.div_euclid(86_400);
+    let tod = unix_seconds.rem_euclid(86_400) as u32;
+    let hour = tod / 3600;
+    let min = (tod % 3600) / 60;
+    let sec = tod % 60;
+    let weekday = WEEKDAYS[(z + 4).rem_euclid(7) as usize];
+    // Howard Hinnant civil_from_days (days since Unix epoch → y-m-d).
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!(
+        "{weekday} {month} {day:2} {hour:02}:{min:02}:{sec:02} {year}",
+        month = MONTHS[(month as usize).saturating_sub(1) % 12]
+    )
 }
 
 fn allocate(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -1593,7 +1736,14 @@ fn shadow_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> R
     if flag == 0 {
         // Query: return the object currently shadowing `target`, or 0.
         let shadow = target.lock().shadow.clone();
-        return Ok(shadow.map(LpcValue::Object).unwrap_or(LpcValue::Null));
+        return match shadow {
+            Some(shadow) if shadow.lock().destructed => {
+                target.lock().shadow = None;
+                Ok(LpcValue::Null)
+            }
+            Some(shadow) => Ok(LpcValue::Object(shadow)),
+            None => Ok(LpcValue::Null),
+        };
     }
     let shadow = interpreter.current_object.clone();
     target.lock().shadow = Some(shadow.clone());
@@ -1840,6 +1990,25 @@ fn deep_inherit_list(
     collect_deep_inherits(&program, &mut paths);
     Ok(LpcValue::Array(
         paths.into_iter().map(LpcValue::String).collect(),
+    ))
+}
+
+fn inherit_list_efun(
+    interpreter: &mut Interpreter<'_>,
+    arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    let object = if let Some(value) = arguments.first() {
+        super::object_argument(value, "inherit_list")?
+    } else {
+        interpreter.current_object.clone()
+    };
+    let program = object.lock().program.clone();
+    Ok(LpcValue::Array(
+        program
+            .inherit_programs
+            .iter()
+            .map(|inherit| LpcValue::String(inherit.path.clone()))
+            .collect(),
     ))
 }
 
@@ -2540,10 +2709,454 @@ fn socket_error_stub(
 }
 
 fn dump_socket_status(
+    interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    write_caller(
+        interpreter,
+        "Fd    State      Mode       Local Address          Remote Address\n\
+         --  ---------  --------  ---------------------  ---------------------\n\
+         (no network sockets — socket efuns are stubs)\n",
+    );
+    Ok(LpcValue::Int(1))
+}
+
+fn write_caller(interpreter: &Interpreter<'_>, message: impl Into<String>) {
+    let message = message.into();
+    let recipient = {
+        let current = interpreter.current_object.clone();
+        if current.lock().interactive.is_some() {
+            current
+        } else if let Some(player) = interpreter.this_player.clone() {
+            if player.lock().interactive.is_some() {
+                player
+            } else {
+                current
+            }
+        } else {
+            current
+        }
+    };
+    recipient.lock().write(message);
+}
+
+fn rusage_efun(
     _interpreter: &mut Interpreter<'_>,
     _arguments: Vec<LpcValue>,
 ) -> Result<LpcValue> {
+    let (utime_ms, stime_ms, maxrss) = process_rusage();
+    let mut info = IndexMap::new();
+    // MudOS man page keys (milliseconds).
+    info.insert("utime".to_owned(), LpcValue::Int(utime_ms));
+    info.insert("stime".to_owned(), LpcValue::Int(stime_ms));
+    // Nightmare `bench` reads this spelling.
+    info.insert("usertime".to_owned(), LpcValue::Int(utime_ms));
+    info.insert("systime".to_owned(), LpcValue::Int(stime_ms));
+    info.insert("maxrss".to_owned(), LpcValue::Int(maxrss));
+    for key in [
+        "ixrss", "idrss", "isrss", "minflt", "majflt", "nswap", "inblock", "oublock", "msgsnd",
+        "msgrcv", "nsignals", "nvcsw", "nivcsw",
+    ] {
+        info.insert(key.to_owned(), LpcValue::Int(0));
+    }
+    Ok(LpcValue::Mapping(info))
+}
+
+fn process_rusage() -> (i64, i64, i64) {
+    const TICKS_PER_SEC: i64 = 100;
+    let mut utime_ms = 0;
+    let mut stime_ms = 0;
+    let mut maxrss = 0;
+    if let Ok(text) = fs::read_to_string("/proc/self/stat") {
+        if let Some((_, rest)) = text.rsplit_once(')') {
+            let fields: Vec<&str> = rest.split_whitespace().collect();
+            if let (Some(ut), Some(st)) = (fields.get(11), fields.get(12)) {
+                if let (Ok(ut), Ok(st)) = (ut.parse::<i64>(), st.parse::<i64>()) {
+                    utime_ms = ut.saturating_mul(1000) / TICKS_PER_SEC;
+                    stime_ms = st.saturating_mul(1000) / TICKS_PER_SEC;
+                }
+            }
+            if let Some(rss) = fields.get(21).and_then(|v| v.parse::<i64>().ok()) {
+                maxrss = rss.saturating_mul(4);
+            }
+        }
+    }
+    if let Ok(status) = fs::read_to_string("/proc/self/status") {
+        for line in status.lines() {
+            if let Some(value) = line.strip_prefix("VmHWM:") {
+                let kb = value
+                    .split_whitespace()
+                    .next()
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .unwrap_or(0);
+                if kb > 0 {
+                    maxrss = kb;
+                }
+                break;
+            }
+        }
+    }
+    (utime_ms, stime_ms, maxrss)
+}
+
+fn debug_info(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 1, "debug_info")?;
+    let operation = arguments[0].as_int().unwrap_or(0);
+    let object = arguments
+        .get(1)
+        .map(|value| super::object_argument(value, "debug_info"))
+        .transpose()?
+        .unwrap_or_else(|| interpreter.current_object.clone());
+    let report = match operation {
+        0 => debug_info_object(&object),
+        1 => debug_info_program(&object),
+        _ => format!("debug_info: unknown operation {operation}\n"),
+    };
+    write_caller(interpreter, report);
+    Ok(LpcValue::Int(0))
+}
+
+fn debug_flag(label: &str, value: bool) -> String {
+    format!("{label:<18}: {}\n", if value { "TRUE" } else { "FALSE" })
+}
+
+fn debug_info_object(object: &ObjectRef) -> String {
+    let guard = object.lock();
+    let env = guard
+        .environment()
+        .map(|env| env.lock().file_name())
+        .unwrap_or_else(|| "(none)".to_owned());
+    let name = guard.file_name();
+    format!(
+        "{}{}{}{}{}{}{}{}{}{}\
+total light : 0\n\
+next_reset  : 0\n\
+time_of_ref : 0\n\
+ref         : 1\n\
+swap_num    : -1\n\
+name        : '{name}'\n\
+environment : {env}\n\
+file_name   : {name}\n",
+        debug_flag("O_HEART_BEAT", guard.heart_beat != 0),
+        debug_flag("O_IS_WIZARD", guard.wizard),
+        debug_flag("O_ENABLE_COMMANDS", guard.commands_enabled),
+        debug_flag("O_CLONE", guard.clone_number.is_some()),
+        debug_flag("O_DESTRUCTED", guard.destructed),
+        debug_flag("O_SWAPPED", false),
+        debug_flag("O_ONCE_INTERACTIVE", guard.interactive.is_some()),
+        debug_flag("O_RESET_STATE", false),
+        debug_flag("O_WILL_CLEAN_UP", false),
+        debug_flag("O_WILL_RESET", guard.program.has_function("reset")),
+    )
+}
+
+fn debug_info_program(object: &ObjectRef) -> String {
+    let guard = object.lock();
+    let program = &guard.program;
+    let refs = Arc::strong_count(program);
+    let mut func_count = 0usize;
+    let mut program_size = 0usize;
+    let mut string_count = 0usize;
+    count_program_stats(program, &mut func_count, &mut program_size, &mut string_count);
+    format!(
+        "program ref's {refs}\n\
+Name {}\n\
+program size {program_size}\n\
+num func's {func_count}\n\
+num strings {string_count}\n\
+num vars {}\n\
+num inherits {}\n\
+total size {}\n",
+        program.path,
+        program.globals.len(),
+        program.inherits.len(),
+        program_size
+            .saturating_add(program.globals.len() * 16)
+            .saturating_add(func_count * 16),
+    )
+}
+
+fn count_program_stats(
+    program: &Program,
+    func_count: &mut usize,
+    program_size: &mut usize,
+    string_count: &mut usize,
+) {
+    *func_count += program.local_functions.len();
+    for function in program.local_functions.values() {
+        *program_size += function.code.len();
+        for op in &function.code {
+            if let crate::vm::program::Op::Constant(LpcValue::String(_)) = op {
+                *string_count += 1;
+            }
+        }
+    }
+    for inherited in &program.inherit_programs {
+        count_program_stats(inherited, func_count, program_size, string_count);
+    }
+}
+
+fn dumpallobj(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let path = arguments
+        .first()
+        .and_then(LpcValue::as_string)
+        .unwrap_or("/OBJ_DUMP");
+    let mut out = String::from("object                                   hb clone environment\n");
+    for object in interpreter.world.all_objects() {
+        let guard = object.lock();
+        let env = guard
+            .environment()
+            .map(|env| env.lock().file_name())
+            .unwrap_or_default();
+        let clone = guard
+            .clone_number
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "-".to_owned());
+        out.push_str(&format!(
+            "{:<40} {:>2} {:>5} {}\n",
+            guard.file_name(),
+            if guard.heart_beat != 0 { 1 } else { 0 },
+            clone,
+            env
+        ));
+    }
+    let resolved = resolve_mudlib_path(interpreter, path)?;
+    if let Some(parent) = resolved.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::write(&resolved, out.as_bytes())?;
+    interpreter.world.fs_cache.invalidate(&resolved);
     Ok(LpcValue::Int(1))
+}
+
+fn dump_file_descriptors(
+    interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    let mut out = String::from("Fd  Target\n--  ------\n");
+    let mut fds = Vec::new();
+    if let Ok(entries) = fs::read_dir("/proc/self/fd") {
+        for entry in entries.flatten() {
+            if let Ok(fd) = entry.file_name().to_string_lossy().parse::<i32>() {
+                fds.push(fd);
+            }
+        }
+    }
+    fds.sort_unstable();
+    for fd in fds {
+        let target = fs::read_link(format!("/proc/self/fd/{fd}"))
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "(unknown)".to_owned());
+        out.push_str(&format!("{fd:>2}  {target}\n"));
+    }
+    write_caller(interpreter, out);
+    Ok(LpcValue::Int(1))
+}
+
+fn cache_stats(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let (hits, misses, stats, dirs) = interpreter.world.fs_cache.counters();
+    let total = hits.saturating_add(misses);
+    let rate = if total == 0 {
+        0
+    } else {
+        hits.saturating_mul(100) / total
+    };
+    write_caller(
+        interpreter,
+        format!(
+            "Filesystem stat cache:\n  hits     : {hits}\n  misses   : {misses}\n  hit rate : {rate}%\n  stats    : {stats}\n  dirs     : {dirs}\n"
+        ),
+    );
+    Ok(LpcValue::Int(1))
+}
+
+fn malloc_status(
+    _interpreter: &mut Interpreter<'_>,
+    _arguments: Vec<LpcValue>,
+) -> Result<LpcValue> {
+    Ok(LpcValue::String(process_memory_report()))
+}
+
+fn process_memory_report() -> String {
+    let mut vm_peak = String::from("?");
+    let mut vm_size = String::from("?");
+    let mut vm_rss = String::from("?");
+    if let Ok(status) = fs::read_to_string("/proc/self/status") {
+        for line in status.lines() {
+            if let Some(value) = line.strip_prefix("VmPeak:") {
+                vm_peak = value.trim().to_owned();
+            } else if let Some(value) = line.strip_prefix("VmSize:") {
+                vm_size = value.trim().to_owned();
+            } else if let Some(value) = line.strip_prefix("VmRSS:") {
+                vm_rss = value.trim().to_owned();
+            }
+        }
+    }
+    format!(
+        "Using system malloc (Rust allocator)\n\
+VmPeak: {vm_peak}\n\
+VmSize: {vm_size}\n\
+VmRSS : {vm_rss}\n"
+    )
+}
+
+fn mud_status(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    let extra = arguments.first().is_some_and(LpcValue::is_truthy);
+    let objects = interpreter.world.all_objects();
+    let users = interpreter.world.users().len();
+    let livings = objects
+        .iter()
+        .filter(|object| {
+            let guard = object.lock();
+            guard.commands_enabled || guard.living_name.is_some()
+        })
+        .count();
+    let heartbeats = objects
+        .iter()
+        .filter(|object| object.lock().heart_beat != 0)
+        .count();
+    let call_outs = interpreter.world.call_outs.info().len();
+    let mut out = format!(
+        "Mud: {}\n\
+Uptime: {} seconds\n\
+Objects: {}\n\
+Users: {users}\n\
+Livings: {livings}\n\
+Heartbeats: {heartbeats}\n\
+Call outs: {call_outs}\n",
+        interpreter.world.config.mud_name,
+        interpreter.world.started.elapsed().as_secs(),
+        objects.len(),
+    );
+    if extra {
+        let (hits, misses, stats, dirs) = interpreter.world.fs_cache.counters();
+        out.push_str(&format!(
+            "\nAdd_message statistics: (not collected)\n\
+Hash table of living objects: {}\n\
+Function cache: (compiled programs held on objects)\n\
+Filesystem cache hits/misses: {hits}/{misses} (stats {stats}, dirs {dirs})\n\
+Shared string hash table: (Rust String)\n\
+Object name hash table: {} blueprints\n",
+            interpreter.world.livings.read().len(),
+            interpreter.world.blueprints.read().len(),
+        ));
+        let living_names: Vec<String> = interpreter.world.livings.read().keys().cloned().collect();
+        if !living_names.is_empty() {
+            out.push_str("Living names:\n");
+            for name in living_names {
+                out.push_str(&format!("  {name}\n"));
+            }
+        }
+    }
+    Ok(LpcValue::String(out))
+}
+
+#[derive(Clone, Default)]
+struct OwnerStatRow {
+    moves: i64,
+    cost: i64,
+    errors: i64,
+    heart_beats: i64,
+    worth: i64,
+    array_size: i64,
+    objects: i64,
+}
+
+impl OwnerStatRow {
+    fn to_mapping(&self) -> LpcValue {
+        let mut map = IndexMap::new();
+        map.insert("moves".to_owned(), LpcValue::Int(self.moves));
+        map.insert("cost".to_owned(), LpcValue::Int(self.cost));
+        map.insert("errors".to_owned(), LpcValue::Int(self.errors));
+        map.insert("heart_beats".to_owned(), LpcValue::Int(self.heart_beats));
+        map.insert("worth".to_owned(), LpcValue::Int(self.worth));
+        map.insert("array_size".to_owned(), LpcValue::Int(self.array_size));
+        map.insert("objects".to_owned(), LpcValue::Int(self.objects));
+        LpcValue::Mapping(map)
+    }
+}
+
+fn author_stats(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    owner_stats(interpreter, true, arguments.first().and_then(LpcValue::as_string))
+}
+
+fn domain_stats(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    owner_stats(interpreter, false, arguments.first().and_then(LpcValue::as_string))
+}
+
+fn owner_stats(
+    interpreter: &mut Interpreter<'_>,
+    authors: bool,
+    filter: Option<&str>,
+) -> Result<LpcValue> {
+    let apply_name = if authors { "author_file" } else { "domain_file" };
+    let fallback = if authors {
+        "unknown-author"
+    } else {
+        "unknown-domain"
+    };
+    let mut rows: IndexMap<String, OwnerStatRow> = IndexMap::new();
+    for object in interpreter.world.all_objects() {
+        let key = owner_key(interpreter, &object, apply_name, fallback);
+        let (heart, moves) = {
+            let guard = object.lock();
+            (
+                i64::from(guard.heart_beat != 0),
+                guard.move_count,
+            )
+        };
+        let row = rows.entry(key).or_default();
+        row.objects += 1;
+        row.heart_beats += heart;
+        row.moves += moves;
+    }
+    if let Some(name) = filter {
+        return Ok(rows.get(name).cloned().unwrap_or_default().to_mapping());
+    }
+    Ok(LpcValue::Mapping(
+        rows.into_iter()
+            .map(|(name, row)| (name, row.to_mapping()))
+            .collect(),
+    ))
+}
+
+fn owner_key(
+    interpreter: &mut Interpreter<'_>,
+    object: &ObjectRef,
+    apply_name: &str,
+    fallback: &str,
+) -> String {
+    {
+        let guard = object.lock();
+        if apply_name == "author_file" {
+            if let Some(author) = &guard.author {
+                return author.clone();
+            }
+        } else if let Some(domain) = &guard.domain {
+            return domain.clone();
+        }
+    }
+    let path = object.lock().name.clone();
+    let key = match interpreter.world.master() {
+        Some(master) => match interpreter.world.apply(
+            master,
+            apply_name,
+            vec![LpcValue::String(path)],
+            None,
+            None,
+        ) {
+            Ok(LpcValue::String(text)) if !text.is_empty() => text,
+            _ => fallback.to_owned(),
+        },
+        None => fallback.to_owned(),
+    };
+    let mut guard = object.lock();
+    if apply_name == "author_file" {
+        guard.author = Some(key.clone());
+    } else {
+        guard.domain = Some(key.clone());
+    }
+    key
 }
 
 #[allow(dead_code)]

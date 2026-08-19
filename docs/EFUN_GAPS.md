@@ -88,6 +88,55 @@ Unknown names abort the apply (`unknown efun` in `src/vm/interpret.rs`).
 | `this_interactive` | Interactive `this_player`, else interactive `this_object` |
 | `remove_action` | Drops matching sentence this object registered on the giver |
 | `get_dir` / `file_size` | MudOS `-1`/`-2` / `get_dir(path, -1)` triples; 5s stat cache |
+| `repeat_string` | `str` repeated `n` times (capped) |
+| `rmdir` | Empty directory only (`remove_dir`) |
+| `tail` | Last 20 lines of a file, written to the player |
+| `inherit_list` | Immediate inherits (not deep) |
+| `read_bytes` | Byte slice of a file as a string |
+| `rusage` | Mapping of process times (`utime`/`usertime` milliseconds) |
+| `debug_info` | Object flags (0) / program sizes (1), written to the caller |
+| `dumpallobj` | Object table written to a mudlib file |
+| `dump_file_descriptors` | Open fd list |
+| `cache_stats` | FS cache hit rate |
+| `malloc_status` / `mud_status` | Status strings (Nightmare `more(explode(...))`) |
+| `author_stats` / `domain_stats` | Per-author/domain maps via master applies |
+
+---
+
+## `cmds/` inventory (mortal first)
+
+Compile of top-level `_*.c` in `mortal`, `hm`, `creator`, `system`, `adm`, `mentor`: **265 ok**. Test: `compile_cmd_dirs`.
+
+Mortal `cmd_*` apply with simul_efun loaded: **no unknown efun**. Test: `mortal_cmds_apply_without_unknown_efun` (skips FS-heavy `help`/`news`/`mail`/`finger`/`faq`/`bug`/`idea`/`typo`/`praise`/`mudidea`/`biography`/`background` and destructive `suicide`).
+
+### Mortal — efun-ready
+
+All 93 top-level mortal commands **compile**. Runtime unknown-efun scan is clean once simul_efun is loaded (`syntax`, `arrange_string`, `format_page`, `effective_light` are simuls).
+
+Still mudlib/FS limited (not missing efuns): `help`/`news`/`mail`/`finger` (daemons + `more`/`get_dir`), `suicide` (`rmdir` now present).
+
+Compile fixes applied: `_colour` (missing wizard include → local `valid_colour`), `_news` (`EndText);` here-doc trailer).
+
+### Wizard/system — driver internals (cmds compile; efuns present)
+
+| Efun | Used by | Notes |
+| --- | --- | --- |
+| `author_stats` | `cmds/creator/_realms.c` | Live objects grouped via `master->author_file`; `"moves"` from `move_object` |
+| `domain_stats` | `cmds/creator/_domains.c` | Same shape via `master->domain_file` |
+| `cache_stats` | `cmds/adm/_cache.c` | Writes FS stat-cache hit/miss |
+| `malloc_status` | `cmds/creator/_malloc.c` | Returns process `Vm*` text (Nightmare `more()` expects a string) |
+| `mud_status` | `cmds/creator/_mstatus.c` | Returns driver summary string; extra flag adds tables |
+| `debug_info` | `cmds/system/_debug_info.c` | Op 0 object flags, op 1 program stats |
+| `dumpallobj` | `cmds/adm/_dumpallobj.c` | Writes object list to mudlib path (`/OBJ_DUMP` default) |
+| `dump_file_descriptors` | `cmds/adm/_fdinfo.c` | `/proc/self/fd` table |
+| `rusage` | `cmds/adm/_bench.c` | Mapping; `utime`/`stime` ms plus Nightmare `usertime` |
+
+### Wizard — compile skip (not efuns)
+
+| File | Why |
+| --- | --- |
+| `cmds/creator/_pupdate.c` | `CONFIG_DIR` never defined |
+| `cmds/creator/_unref.c` | `inherit REFS_D` is a concatenated path, not a string literal |
 
 ---
 
@@ -115,8 +164,6 @@ In MudOS `func_spec` / man pages, **not** called from `std` or `adm/obj`. Do not
 
 Useful later: `unique_mapping`, `this_interactive` (now present), …
 
-Driver internals (skip): `dumpallobj`, `malloc_status`, `mud_status`, …
-
 ---
 
 ## MudOS packages
@@ -134,7 +181,8 @@ Driver internals (skip): `dumpallobj`, `malloc_status`, `mud_status`, …
 1. **`ed`** — full interactive editor if wizard edit matters
 2. **`virtualp`** — return 1 once virtual objects exist
 3. **`localtime`** — local TZ / `LT_GMTOFF` if HTTP/SMTP date stamps must be local
+4. Socket family — real TCP instead of `EESOCKET` stubs (`netstat` already reports the stub)
 
 After driver changes: `cargo build --release`, fully restart `rmudos`.
 
-Tests: `parse_command_pet_go_pattern`, `unique_array_groups_by_callback`, `localtime_epoch_is_utc_thursday`, `get_dir_and_file_size_match_mudos` in [`src/lib.rs`](../src/lib.rs).
+Tests: `compile_cmd_dirs`, `mortal_cmds_apply_without_unknown_efun`, `wizard_status_efuns::*`, `parse_command_pet_go_pattern`, `unique_array_groups_by_callback`, `localtime_epoch_is_utc_thursday`, `get_dir_and_file_size_match_mudos` in [`src/lib.rs`](../src/lib.rs).

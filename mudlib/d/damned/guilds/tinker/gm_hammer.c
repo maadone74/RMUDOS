@@ -35,8 +35,10 @@ int query_always_keep() { return 1; }
 int make_me_gm() {
 object ob;
 
+  if(!this_player() || !this_player()->is_player() || wizardp(this_player()))
+    return 1;
   seteuid(getuid());
-  ob= new("d/damned/guilds/tinker/tinker_obj");
+  ob= new("/d/damned/guilds/tinker/tinker_obj");
   ob->make_me_master(this_player());
   return 1;
 }

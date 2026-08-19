@@ -94,6 +94,8 @@ Supported directives: `%%`, `%s`, `%d`/`%i`, `%f`, `%O` (LPC repr). Optional wid
 
 `this_object()` is a **compiler intrinsic**, not an efun table entry.
 
+`getuid()` / `getuid(ob)` return that object's uid (no-arg form is the current object).
+
 Path arguments are normalized (`\`, optional `.c`, leading `/`).
 
 ---
@@ -125,3 +127,4 @@ There is currently **no** package loading system. A large MudOS-oriented efun se
 | Login | `exec`, `crypt`, `user_exists`, `query_ip_number`, `find_player`, `find_living`, `set_living_name` |
 | Persist | `save_object`, `restore_object` |
 | Misc | `sscanf` (out-param assignment), `replace_string`, `ctime`, `present`, `deep_inventory`, `shadow`, `receive`, `error`, `function_exists`, `export_uid`, `save_variable`, `restore_variable` |
+| Wizard internals | `rusage`, `debug_info`, `dumpallobj`, `dump_file_descriptors`, `cache_stats`, `malloc_status`, `mud_status`, `author_stats`, `domain_stats` |

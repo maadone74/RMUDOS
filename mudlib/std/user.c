@@ -335,16 +335,16 @@ void remove() {
         && previous_object() && previous_object() != this_object() && geteuid(previous_object()) != UID_ROOT && 
 	  TP != TO) return;
     destroy_autoload_obj();
-    CHAT_D->remove_user();
-    INFORM_D->remove_user(this_object());
+    catch(CHAT_D->remove_user());
+    catch(INFORM_D->remove_user(this_object()));
     if(!hiddenp(this_object()))
 	if(_quitting)
-	    INFORM_D->do_inform("logins_and_quits","Info: " +
+	    catch(INFORM_D->do_inform("logins_and_quits","Info: " +
 	      capitalize((string)this_object()->query_name()) +
                 " has stepped beyond the boundary of Daybreak Ridge.",
-	      who_exc);
-    MULTI_D->quit(query_name());
-    this_object()->tsh_cleanup();
+	      who_exc));
+    catch(MULTI_D->quit(query_name()));
+    catch(this_object()->tsh_cleanup());
 living::remove();
 }
 
@@ -379,7 +379,7 @@ protected int finish_quit(object ob) {
 	      (string)ENV(ob)->query_short() != "" ?
 	      "Setting start location to " + ENV(ob)->query_short() + "..." : 
 	      "Setting start location here...", ob);
-	    ob->setenv("start", file_name(environment(ob)));
+	    ob->setenv("start", BN(ENV(ob)));
 	    if((string)ob->getenv("start") == BN(ENV(ob)))
 		message("quit_save", "%^BLUE%^Successful.%^RESET%^", ob);
 	    else message("quit_save", "%^RED%^Unsuccessful.%^RESET%^", ob);
@@ -393,8 +393,8 @@ protected int finish_quit(object ob) {
     }
     message("quit", "%^CYAN%^Reality suspended.  See you another time!%^RESET%^",
       ob);
-    catch(SAVEALL_D->add_crash_items(this_object(),1));
-      TELL_CLEAN_D->clean_tell(this_object());
+    /* Skip SAVEALL_D: crash-item save can freeze telnet on this driver. */
+      catch(TELL_CLEAN_D->clean_tell(this_object()));
     ob->set_attackers( ({ }) );
     ob->stop_hunting();
     count2 = 1;
@@ -410,10 +410,10 @@ protected int finish_quit(object ob) {
       (string)this_object()->query_name()+
       ":"+ctime(time())+"\n"
       );
-    PLAYER_D->add_player_info();
+    catch(PLAYER_D->add_player_info());
     tmp = shadow(ob, 0);
     while(tmp){
-        tmp->external_destruct(tmp);
+        catch(tmp->external_destruct(tmp));
         tmp = shadow(ob, 0);
     }
     ob->remove();
@@ -448,6 +448,9 @@ void setup() {
 
     set_living_name(query_name());
     seteuid(getuid());
+    /* Wizards must operate under their name euid so access.db groups match. */
+    if(query_name())
+        seteuid(query_name());
     // Delay heart_beat until setup finishes so do_healing cannot interleave
     // with login (and so SCORE can be set off in the setter first).
     if(!stats) init_stats();

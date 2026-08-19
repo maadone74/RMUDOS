@@ -47,6 +47,8 @@ impl CachedStat {
 struct Inner {
     stats: HashMap<PathBuf, (Instant, CachedStat)>,
     dirs: HashMap<PathBuf, (Instant, Vec<String>)>,
+    hits: u64,
+    misses: u64,
 }
 
 pub struct FsCache {
@@ -65,13 +67,21 @@ impl FsCache {
             inner: Mutex::new(Inner {
                 stats: HashMap::new(),
                 dirs: HashMap::new(),
+                hits: 0,
+                misses: 0,
             }),
         }
     }
 
     pub fn stat(&self, path: &Path) -> CachedStat {
         if let Some(cached) = self.cached_stat(path) {
+            let mut inner = self.inner.lock();
+            inner.hits = inner.hits.saturating_add(1);
             return cached;
+        }
+        {
+            let mut inner = self.inner.lock();
+            inner.misses = inner.misses.saturating_add(1);
         }
         let value = stat_uncached(path);
         self.inner
@@ -83,12 +93,15 @@ impl FsCache {
 
     pub fn list_dir(&self, path: &Path) -> Option<Vec<String>> {
         {
-            let inner = self.inner.lock();
+            let mut inner = self.inner.lock();
             if let Some((at, names)) = inner.dirs.get(path) {
                 if at.elapsed() < TTL {
-                    return Some(names.clone());
+                    let names = names.clone();
+                    inner.hits = inner.hits.saturating_add(1);
+                    return Some(names);
                 }
             }
+            inner.misses = inner.misses.saturating_add(1);
         }
         let mut names = Vec::new();
         let entries = fs::read_dir(path).ok()?;
@@ -108,6 +121,17 @@ impl FsCache {
             .dirs
             .insert(path.to_path_buf(), (Instant::now(), names.clone()));
         Some(names)
+    }
+
+    /// Hits, misses, cached stat entries, cached directory listings.
+    pub fn counters(&self) -> (u64, u64, usize, usize) {
+        let inner = self.inner.lock();
+        (
+            inner.hits,
+            inner.misses,
+            inner.stats.len(),
+            inner.dirs.len(),
+        )
     }
 
     pub fn invalidate(&self, path: &Path) {

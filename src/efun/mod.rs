@@ -261,9 +261,14 @@ fn explode(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resu
             .map(|ch| LpcValue::String(ch.to_string()))
             .collect()
     } else {
-        value
-            .split(separator)
-            .filter(|part| !part.is_empty())
+        // MudOS: keep empty fields between delimiters (blank lines in more()).
+        // Drop only a trailing empty when the source ended with the delimiter.
+        let mut parts: Vec<&str> = value.split(separator).collect();
+        if value.ends_with(separator) && parts.last() == Some(&"") {
+            parts.pop();
+        }
+        parts
+            .into_iter()
             .map(|part| LpcValue::String(part.to_owned()))
             .collect()
     };
@@ -439,7 +444,10 @@ fn clone_object(
     arguments: Vec<LpcValue>,
 ) -> Result<LpcValue> {
     let path = string_argument(&arguments, 0, "clone_object")?;
-    Ok(LpcValue::Object(interpreter.world.clone_object(path)?))
+    Ok(LpcValue::Object(interpreter.world.clone_object_from(
+        path,
+        Some(interpreter.current_object.clone()),
+    )?))
 }
 
 fn load_object(
@@ -526,7 +534,11 @@ fn file_name(
     arguments: Vec<LpcValue>,
 ) -> Result<LpcValue> {
     let object = if let Some(value) = arguments.first() {
-        object_argument(value, "file_name")?
+        match resolve_object(interpreter, value, false)? {
+            Some(object) => object,
+            // MudOS: file_name(0) is 0; set_stats logs it next to getuid(previous_object()).
+            None => return Ok(LpcValue::Int(0)),
+        }
     } else {
         interpreter.current_object.clone()
     };
@@ -603,8 +615,18 @@ fn call_other(
     interpreter.call_function(target, &function, arguments)
 }
 
-fn getuid(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
-    Ok(LpcValue::String(interpreter.current_object.lock().uid.clone()))
+fn getuid(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    if arguments.is_empty() {
+        return Ok(LpcValue::String(
+            interpreter.current_object.lock().uid.clone(),
+        ));
+    }
+    // MudOS: getuid(0) / getuid(destructed) returns 0. Nightmare set_stats()
+    // logs getuid(previous_object()) during clone create(), when previous is 0.
+    match resolve_object(interpreter, &arguments[0], false)? {
+        Some(object) => Ok(LpcValue::String(object.lock().uid.clone())),
+        None => Ok(LpcValue::Int(0)),
+    }
 }
 
 fn geteuid(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -613,10 +635,10 @@ fn geteuid(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resul
             interpreter.current_object.lock().euid.clone(),
         ));
     }
-    let object = resolve_object(interpreter, &arguments[0], false)?
-        .context("geteuid target does not exist")?;
-    let euid = object.lock().euid.clone();
-    Ok(LpcValue::String(euid))
+    match resolve_object(interpreter, &arguments[0], false)? {
+        Some(object) => Ok(LpcValue::String(object.lock().euid.clone())),
+        None => Ok(LpcValue::Int(0)),
+    }
 }
 
 fn seteuid(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -930,7 +952,14 @@ fn printf(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result
 }
 
 fn atoi(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
-    let value = string_argument(&arguments, 0, "atoi")?;
+    require(&arguments, 1, "atoi")?;
+    let value = match arguments.get(0) {
+        Some(LpcValue::Null) | Some(LpcValue::Int(0)) => return Ok(LpcValue::Int(0)),
+        Some(LpcValue::Int(n)) => return Ok(LpcValue::Int(*n)),
+        Some(LpcValue::String(s)) => s.as_str(),
+        Some(other) => other.as_string().unwrap_or(""),
+        None => return Ok(LpcValue::Int(0)),
+    };
     Ok(LpcValue::Int(value.trim().parse().unwrap_or(0)))
 }
 
@@ -1186,7 +1215,7 @@ fn present(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resul
             }
             LpcValue::String(id) => {
                 let name = object.lock().file_name();
-                if name == *id || name.ends_with(id.as_str()) {
+                if object_name_matches_present(&name, id) {
                     return Ok(LpcValue::Object(object));
                 }
                 let id_result = interpreter.world.apply(
@@ -1347,6 +1376,25 @@ fn object_has_function(object: &ObjectRef, name: &str) -> bool {
 fn is_living_object(object: &ObjectRef) -> bool {
     let guard = object.lock();
     !guard.destructed && (guard.commands_enabled || guard.living_name.is_some())
+}
+
+/// Match `present("cig")` against `/d/foo/cig#6` as well as `id()`.
+fn object_name_matches_present(file_name: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    if file_name == needle || file_name.ends_with(needle) {
+        return true;
+    }
+    let without_clone = file_name
+        .split_once('#')
+        .map(|(path, _)| path)
+        .unwrap_or(file_name);
+    if without_clone == needle {
+        return true;
+    }
+    let base = without_clone.rsplit('/').next().unwrap_or(without_clone);
+    base == needle
 }
 
 /// MudOS `message()`: apply `receive_message(class, msg)` on livings so mudlib

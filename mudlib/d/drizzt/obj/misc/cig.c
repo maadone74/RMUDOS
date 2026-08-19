@@ -8,7 +8,7 @@ inherit OBJECT;
 void create() {
   ::create();
   set_name("cigarrette");
-  set_id( ({ "joint", "j", "doobie", "cigarrette", "marley" }) );
+  set_id( ({ "cig", "joint", "j", "doobie", "cigarrette", "marley" }) );
   set_short("An unlit cigarrette");
   set_long("A cigarrette.  Light it with 'light cigarrette', "+
 	"smoke it with 'smoke cigarrette'");

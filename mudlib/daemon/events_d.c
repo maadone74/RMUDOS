@@ -33,7 +33,7 @@ void create() {
     restore_object(SAVE_EVENTS);
     seteuid(getuid());
     if(!__RebootInterval) __RebootInterval = 24;
-    if(!__Events) __Events = ([]);
+    if(!mapp(__Events)) __Events = ([]);
     Save();
     configure_day();
     call_out("check_events", 60);

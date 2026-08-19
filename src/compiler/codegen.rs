@@ -929,11 +929,23 @@ impl ExpressionCompiler<'_> {
             if !is_lvalue(target) {
                 bail!("sscanf output argument must be an lvalue");
             }
+            // MudOS: unmatched captures leave the out parameter unchanged.
+            // Indexing past sizeof(captures) used to store 0/null, so
+            // `substr()` / `query_title()` concatenated a trailing "0".
+            self.code.push(Op::Dup);
+            self.code.push(Op::CallEfun("sizeof".to_owned(), 1));
+            self.code.push(Op::Constant(LpcValue::Int(index as i64)));
+            self.code.push(Op::Swap);
+            self.code.push(Op::Less);
+            let skip = self.code.len();
+            self.code.push(Op::JumpIfFalse(usize::MAX));
             self.code.push(Op::Dup);
             self.code.push(Op::Constant(LpcValue::Int(index as i64)));
             self.code.push(Op::Index);
             self.compile_store_lvalue(target)?;
             self.code.push(Op::Pop);
+            let after = self.code.len();
+            patch_expression_jump(self.code, skip, after);
         }
         self.code
             .push(Op::CallEfun("sizeof".to_owned(), 1));
@@ -1040,12 +1052,16 @@ impl ExpressionCompiler<'_> {
             Expr::Variable(name) => self.store_variable(name),
             Expr::Index { value: base, index } => {
                 // stack: value
-                self.compile_expression(base)?; // value, base
-                self.code.push(Op::Swap); // base, value
-                self.compile_expression(index)?; // base, value, index
-                self.code.push(Op::Swap); // base, index, value
-                self.code.push(Op::IndexSet); // updated_base
-                self.compile_store_lvalue(base)?; // store updated_base into base
+                // MudOS: `m[k] = v` as an expression yields `v`, not the mapping.
+                // more() does `sizeof(__More["lines"] = what)` and needs the array size.
+                self.code.push(Op::Dup); // value, value
+                self.compile_expression(base)?; // value, value, base
+                self.code.push(Op::Swap); // value, base, value
+                self.compile_expression(index)?; // value, base, value, index
+                self.code.push(Op::Swap); // value, base, index, value
+                self.code.push(Op::IndexSet); // value, updated_base
+                self.compile_store_lvalue(base)?; // value, updated_base
+                self.code.push(Op::Pop); // value
                 Ok(())
             }
             Expr::Slice {
@@ -1054,22 +1070,24 @@ impl ExpressionCompiler<'_> {
                 end,
             } => {
                 // stack: replacement
-                self.compile_expression(base)?; // repl, base
-                self.code.push(Op::Swap); // base, repl
+                self.code.push(Op::Dup); // repl, repl
+                self.compile_expression(base)?; // repl, repl, base
+                self.code.push(Op::Swap); // repl, base, repl
                 if let Some(start) = start {
                     self.compile_expression(start)?;
                 } else {
                     self.code.push(Op::Constant(LpcValue::Null));
-                } // base, repl, start
-                self.code.push(Op::Swap); // base, start, repl
+                } // repl, base, repl, start
+                self.code.push(Op::Swap); // repl, base, start, repl
                 if let Some(end) = end {
                     self.compile_expression(end)?;
                 } else {
                     self.code.push(Op::Constant(LpcValue::Null));
-                } // base, start, repl, end
-                self.code.push(Op::Swap); // base, start, end, repl
-                self.code.push(Op::SliceSet); // updated_base
+                } // repl, base, start, repl, end
+                self.code.push(Op::Swap); // repl, base, start, end, repl
+                self.code.push(Op::SliceSet); // repl, updated_base
                 self.compile_store_lvalue(base)?;
+                self.code.push(Op::Pop); // repl
                 Ok(())
             }
             Expr::Member { object, field } => {

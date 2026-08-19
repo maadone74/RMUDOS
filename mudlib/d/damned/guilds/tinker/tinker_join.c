@@ -19,7 +19,7 @@ void create() {
   ::create();
   set_property("light", 2);
   set_property("indoors", 1);
-new("d/damned/guilds/join_rooms/tcan")->move(this_object());
+  catch(new("/d/damned/guilds/join_rooms/tcan")->move(this_object()));
   set_related_guilds(({ "fighter", "enchanter" }));
   set("short", "The Tinker's Guild Joining Room");
   set("long", 
@@ -36,7 +36,7 @@ new("d/damned/guilds/join_rooms/tcan")->move(this_object());
   set_exits( ([ 
 	      "east" : "/d/damned/akkad/ak_sd4",
 	      "up" : "/d/damned/guilds/tinker/train_room",
-	      "west" : "d/damned/guilds/tinker/tinker_shop" ]) );
+	      "west" : "/d/damned/guilds/tinker/tinker_shop" ]) );
 
 //Class Check added by Maxwell 7/96
   set_pre_exit_functions(({"west" }), ({"class_check"}) );
@@ -66,7 +66,7 @@ new("d/damned/guilds/join_rooms/tcan")->move(this_object());
   //  Stat mods received upon joining.
 
   //  The following line is necessary:
-  this_object()->reset();
+  catch(this_object()->reset());
   return;
 }
 int class_check(){

@@ -13,7 +13,7 @@ void create() {
   ::create();
 
   //  The one difference is the following line:
-  set_join_room("/d/damned/guilds/join_rooms/tinker_join");
+  set_join_room("/d/damned/guilds/tinker/tinker_join");
   //  The above refers the guildmaster to the joining room, which
   //  handles all "book keeping"
 
@@ -51,14 +51,16 @@ void create() {
 		"dwarvish", "drow", "mountainspeak", "undead-tongue", "middle-english", "stormspeak",
 		  "ogryn", "orcish" }));
   set_property("ambidextry", 1);
-  ob = new("/d/damned/guilds/tinker/gm_hammer");
-  ob->move(this_object());
-  force_me("wield hammer in right hand and left hand");
-  ob = new("/d/damned/virtual/iron-greaves.armour");
-  ob->set_property("enchantment", 10);
-  ob->set_property("enhance criticals", -1);
-  ob->move(this_object());
-  force_me("wear greaves");
+  if(!catch(ob = new("/d/damned/guilds/tinker/gm_hammer")) && objectp(ob)) {
+    ob->move(this_object());
+    force_me("wield hammer in right hand and left hand");
+  }
+  if(!catch(ob = new("/d/damned/virtual/iron-greaves.armour")) && objectp(ob)) {
+    ob->set_property("enchantment", 10);
+    ob->set_property("enhance criticals", -1);
+    ob->move(this_object());
+    force_me("wear greaves");
+  }
   set_overall_ac(75);
   return;
 }

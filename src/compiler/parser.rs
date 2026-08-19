@@ -835,13 +835,10 @@ impl Parser {
     fn parse_functional(&mut self) -> Result<Expr> {
         let first = self.parse_assignment()?;
         if self.consume_symbol(",") {
-            let Expr::Variable(name) = first else {
-                bail!(self.error("functional with bound arguments requires a function name"));
-            };
-            let mut bound = Vec::new();
+            let mut rest = Vec::new();
             if !self.consume_symbol(":)") {
                 loop {
-                    bound.push(self.parse_assignment()?);
+                    rest.push(self.parse_assignment()?);
                     if self.consume_symbol(":)") {
                         break;
                     }
@@ -851,7 +848,22 @@ impl Parser {
                     }
                 }
             }
-            return Ok(Expr::FunctionalNamed { name, bound });
+            // `(: fun, args... :)` vs MudOS `(: object, "fun" [, extra...] :)`
+            // which is the same as `(: call_other, object, "fun", extra... :)`.
+            return Ok(match first {
+                Expr::Variable(name) => Expr::FunctionalNamed {
+                    name,
+                    bound: rest,
+                },
+                object => {
+                    let mut bound = vec![object];
+                    bound.extend(rest);
+                    Expr::FunctionalNamed {
+                        name: "call_other".to_owned(),
+                        bound,
+                    }
+                }
+            });
         }
         self.expect_symbol(":)")?;
         match first {

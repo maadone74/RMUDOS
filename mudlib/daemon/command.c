@@ -11,6 +11,7 @@ private nosave mapping __Cmds;
 private nosave string *__Paths;
 
 void rehash(mixed *val);
+void ensure_paths(string *path);
 string find_cmd(string cmd, string *path);
 string *query_paths();
 varargs string *query_commands(string str);
@@ -19,7 +20,8 @@ void create() {
     seteuid(getuid());
     __Cmds = ([]);
     __Paths = ({});
-    rehash( ({ DIR_MORTAL_CMDS, DIR_CREATOR_CMDS, DIR_SYSTEM_CMDS, DIR_CLASS_CMDS}) );
+    /* Index mortal/skills at boot; guild/hm/creator paths via ensure_paths at login. */
+    rehash( ({ DIR_MORTAL_CMDS, DIR_CLASS_CMDS }) );
   }
 
 string find_cmd(string cmd, string *path) {
@@ -28,13 +30,15 @@ string find_cmd(string cmd, string *path) {
     if(!cmd || !pointerp(path)) return 0;
     if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
       return sprintf("%s/_%s", tmp[0], cmd);
-    /* Hash any search-path dirs not scanned yet (guild/hm/…). Mortal/skills
-     * were already listed in create(). */
+    return 0;
+  }
+
+void ensure_paths(string *path) {
+    string *tmp;
+
+    if(!pointerp(path)) return;
     tmp = path - (path & __Paths);
     if(sizeof(tmp)) rehash(tmp);
-    if(__Cmds[cmd] && sizeof(tmp = (path & (string *)__Cmds[cmd])))
-      return sprintf("%s/_%s", tmp[0], cmd);
-    return 0;
   }
 
 void rehash(mixed val) {
@@ -79,4 +83,3 @@ varargs string *query_commands(string str) {
     while(i--) if(member_array(str, __Cmds[cmds[i]]) != -1) tmp += ({cmds[i]});
     return tmp;
   }
-

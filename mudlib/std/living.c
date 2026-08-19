@@ -26,6 +26,7 @@ string description;
 nosave string ritual;
 nosave string party;
 nosave string *search_path;
+private nosave string *__cmd_verbs;
 nosave int login_flag;
 private string gender;
 mapping stats;
@@ -221,6 +222,8 @@ protected void init_path() {
 	if(archp(this_object()))
 	    search_path += ({ DIR_ADMIN_CMDS });
     }
+    catch(CMD_D->ensure_paths(search_path));
+    catch(__cmd_verbs = CMD_D->query_commands());
 }
 
 protected void init_stats() { stats = ([]); }
@@ -247,6 +250,9 @@ nomask protected int cmd_hook(string cmd) {
 	  this_player());
 	return 1;
     }
+    /* Unknown verbs: O(1) check against login-time index — no CMD_D at runtime. */
+    if(!pointerp(__cmd_verbs) || member_array(verb, __cmd_verbs) == -1)
+	return 0;
     file = 0;
     debug_message("cmd_hook find_cmd " + verb);
     if(catch(file = (string)CMD_D->find_cmd(verb, search_path)))

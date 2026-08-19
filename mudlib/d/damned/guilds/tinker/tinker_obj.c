@@ -8,7 +8,7 @@ void create() {
   set_long(
 "This symbol takes the form of a small bejeweled hammer.  Type "
 "'help guildmaster' for help.");
-  set_join_room("/d/damned/guilds/join_rooms/tinker_join");
+  set_join_room("/d/damned/guilds/tinker/tinker_join");
   return;
 }
 

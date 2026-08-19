@@ -394,17 +394,29 @@ int valid_read(string file, object ob, string fun) {
 
 nomask int check_access(string file, object ob, int ind) {
     string *path, *grps;
-    string euid, tmp, fn;
+    string euid, tmp, fn, nom;
     int i, j;
 
     while(strlen(file) > 2 && file[0..1] == "//")
   file = replace_string(file, "/", "", 1);
+    if(!groups) load_groups();
     if((euid=geteuid(ob)) == UID_ROOT) return 1;
-    if(sscanf(file, user_path(euid)+"%s", tmp) ==1) return 1;
+    /* access.db lists (superuser)[rw] on most dirs; match name or euid.
+     * Command objects seteuid() to the player, but uid/euid can still be
+     * the file path if export_uid has not run. */
+    if(query_member_group(euid, "superuser")) return 1;
+    if(ob && userp(ob)) {
+      nom = (string)ob->query_name();
+      if(nom && query_member_group(nom, "superuser")) return 1;
+    }
+    /* Home dir itself: resolv_path drops the trailing slash that user_path() adds. */
+    tmp = user_path(euid);
+    if(tmp && strlen(tmp) > 1 && tmp[strlen(tmp)-1] == '/')
+      tmp = tmp[0..(strlen(tmp)-2)];
+    if(file == tmp || (tmp && sscanf(file, tmp+"/%s", tmp) == 1)) return 1;
     if(sscanf(euid, "%sobj", tmp) == 1 && sscanf(file,user_path(tmp)+"%s",tmp)
       ==1) return 1;
     if(!access) load_access();
-    if(!groups) load_groups();
     if(!privs) load_privs();
     fn = base_name(ob);
     if(sscanf(file, REALMS_DIRS+"/%s", tmp) ||

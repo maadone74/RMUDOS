@@ -5,9 +5,17 @@
  *  Do not remove this header
  */
 
-#include "/wizards/geldron/pt/valid_colour.c"
+#include <std.h>
 
 inherit DAEMON;
+
+int valid_colour(string str) {
+    if (!str) return 0;
+    return member_array(lower_case(str), ({
+	"red", "green", "blue", "yellow", "cyan", "magenta", "black",
+	"hired", "higreen", "hiblue", "hiyellow", "hicyan", "himagenta", "hiblack"
+    })) != -1;
+}
 
 int cmd_colour(string arg) {
     string arg1, arg2, *kcolours, *vcolours;

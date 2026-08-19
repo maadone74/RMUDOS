@@ -37,6 +37,8 @@ varargs string wrap(string str, int width, int indent) {
             continue;
         }
         if (count == width) {
+            if (space < offset)
+                space = -1;
             if (space == -1) {
                 ret +=
                 str[offset..i - 1] + sprintf("\n%*s%s", indent, "", str[i..i]);
