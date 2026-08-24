@@ -4,8 +4,8 @@
 #include <options.h>
 
 #define __nightmare__            3.2
-#define MUDLIB_VERSION		"0.2"
-#define MUDLIB			"DarkeLIB"
+#define MUDLIB_VERSION		"0.1Alpha"
+#define MUDLIB			"MaadLIB(DarkeLIB)"
 #define MUD_IS_LOCKED 0
 
 #define GMT_OFFSET               -32000
