@@ -4531,7 +4531,259 @@
 [2m2026-08-24T00:26:44.491054Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
 [2m2026-08-24T00:26:44.492001Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
 [2m2026-08-24T00:26:44.492699Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
-2026-08-24T00:27:01.058712Z  INFO rmudos::efun::mudos_extra: file_size start path="/adm/save/daemons/wizchar.v"
-2026-08-24T00:27:01.059392Z  INFO rmudos::efun::mudos_extra: file_size done path="/adm/save/daemons/wizchar.v" size=5 elapsed_ms=0
-2026-08-24T00:27:01.060182Z  INFO rmudos::efun::mudos_extra: file_size start path="/adm/save/daemons/wizchar.v"
-2026-08-24T00:27:01.060757Z  INFO rmudos::efun::mudos_extra: file_size done path="/adm/save/daemons/wizchar.v" size=5 elapsed_ms=0
+[2m2026-08-24T00:27:46.489900Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:27:46.490218Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:27:46.490536Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:27:46.490772Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:28:48.489932Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:28:48.490746Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:28:48.491775Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:28:48.492586Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:29:50.489336Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:29:50.490113Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:29:50.491026Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:29:50.491802Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:30:52.489578Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:30:52.490424Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:30:52.491672Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:30:52.492382Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:31:54.489520Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:31:54.490288Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:31:54.491222Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:31:54.491928Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:32:56.489262Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:32:56.489920Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:32:56.490732Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:32:56.491133Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:33:58.489655Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:33:58.489991Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:33:58.490338Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:33:58.490575Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:35:00.489095Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:35:00.489676Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:35:00.490427Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:35:00.490926Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:02.489874Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:36:02.490711Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:02.491647Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:36:02.492345Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.489913Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/log/auto_remove"
+[2m2026-08-24T00:36:54.490596Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/log/auto_remove" [3msize[0m[2m=[0m51 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.495924Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/ [3mdetailed[0m[2m=[0mfalse
+[2m2026-08-24T00:36:54.496608Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/ [3mentries[0m[2m=[0m7 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.496625Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/z"
+[2m2026-08-24T00:36:54.497367Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/z" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.497385Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/z/ [3mdetailed[0m[2m=[0mtrue
+[2m2026-08-24T00:36:54.498072Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/z/ [3mentries[0m[2m=[0m0 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.498084Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/t"
+[2m2026-08-24T00:36:54.498719Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/t" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.498731Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/t/ [3mdetailed[0m[2m=[0mtrue
+[2m2026-08-24T00:36:54.499357Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/t/ [3mentries[0m[2m=[0m0 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.499373Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/rid"
+[2m2026-08-24T00:36:54.499934Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/rid" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.499946Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/r"
+[2m2026-08-24T00:36:54.500355Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/r" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.500364Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/r/ [3mdetailed[0m[2m=[0mtrue
+[2m2026-08-24T00:36:54.500751Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/r/ [3mentries[0m[2m=[0m1 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.501221Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/p"
+[2m2026-08-24T00:36:54.501611Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/p" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.501618Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/p/ [3mdetailed[0m[2m=[0mtrue
+[2m2026-08-24T00:36:54.501902Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/p/ [3mentries[0m[2m=[0m1 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.502238Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/0"
+[2m2026-08-24T00:36:54.502504Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/0" [3msize[0m[2m=[0m-2 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.502509Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir start [3mpath[0m[2m=[0m/adm/save/users/0/ [3mdetailed[0m[2m=[0mtrue
+[2m2026-08-24T00:36:54.502779Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m get_dir done [3mpath[0m[2m=[0m/adm/save/users/0/ [3mentries[0m[2m=[0m0 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:36:54.502784Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/users/.gitkeep"
+[2m2026-08-24T00:36:54.503050Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/users/.gitkeep" [3msize[0m[2m=[0m0 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:37:04.489615Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:37:04.490469Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:37:04.491467Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:37:04.492295Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:38:06.489202Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:38:06.490072Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:38:06.491078Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:38:06.491751Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:39:08.489364Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:39:08.490047Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:39:08.490847Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:39:08.491377Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:40:10.489355Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:40:10.489801Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:40:10.490282Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:40:10.490587Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:41:12.490108Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:41:12.490862Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:41:12.491843Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:41:12.492656Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:42:14.489232Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:42:14.490077Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:42:14.493728Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:42:14.494510Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:43:16.489513Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:43:16.490361Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:43:16.491334Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:43:16.492074Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:44:22.489624Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:44:22.490500Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:44:22.491504Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:44:22.492159Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:45:28.489983Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:45:28.490768Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:45:28.491782Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:45:28.492471Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:46:34.490290Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:46:34.491072Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:46:34.492080Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:46:34.492821Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:47:40.490120Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:47:40.490933Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:47:40.491978Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:47:40.492726Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:48:46.490036Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:48:46.490932Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:48:46.491963Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:48:46.492763Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:49:52.489323Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:49:52.490290Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:49:52.491435Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:49:52.492224Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:50:58.489719Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:50:58.490543Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:50:58.491490Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:50:58.492157Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:52:04.490101Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:52:04.490906Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:52:04.491929Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:52:04.492560Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:53:10.489733Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:53:10.490682Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:53:10.491734Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:53:10.492485Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:54:16.489782Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:54:16.490237Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:54:16.490590Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:54:16.490894Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:55:22.489521Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:55:22.490504Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:55:22.491444Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:55:22.492206Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:56:28.489505Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:56:28.490349Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:56:28.491353Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:56:28.492077Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:57:34.489214Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:57:34.490034Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:57:34.491009Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:57:34.491757Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:58:40.489349Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:58:40.489684Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:58:40.490075Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:58:40.490335Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:59:46.489872Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:59:46.490678Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T00:59:46.491662Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T00:59:46.492383Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:00:52.489796Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:00:52.490648Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:00:52.491671Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:00:52.492386Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:01:58.489056Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:01:58.489856Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:01:58.490847Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:01:58.491485Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:03:04.490117Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:03:04.490912Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:03:04.491887Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:03:04.492688Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:04:10.489752Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:04:10.490625Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:04:10.491626Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:04:10.492365Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:05:16.489195Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:05:16.489528Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:05:16.489875Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:05:16.490128Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:06:22.489546Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:06:22.490382Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:06:22.491367Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:06:22.492067Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:07:28.489693Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:07:28.490484Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:07:28.491433Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:07:28.492135Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:08:34.489786Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:08:34.490577Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:08:34.491561Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:08:34.492211Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:09:40.489750Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:09:40.490595Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:09:40.491581Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:09:40.492328Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:10:46.489582Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:10:46.489912Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:10:46.490298Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:10:46.490539Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:11:52.489220Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:11:52.489565Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:11:52.489915Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:11:52.490182Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:12:58.489527Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:12:58.490352Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:12:58.491386Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:12:58.492129Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:14:04.489676Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:14:04.490072Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:14:04.490458Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:14:04.490735Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:15:10.490163Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:15:10.490955Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:15:10.491997Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:15:10.492746Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:16:16.489891Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:16:16.490715Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:16:16.491659Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:16:16.492323Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:17:22.489726Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:17:22.490547Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:17:22.491583Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:17:22.492368Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:18:28.488834Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:18:28.489161Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:18:28.489510Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:18:28.489757Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:19:34.489940Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:19:34.490783Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:19:34.491775Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:19:34.492567Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:20:40.490141Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:20:40.491101Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:20:40.492279Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:20:40.493085Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:21:46.490205Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:21:46.491134Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:21:46.492281Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:21:46.493031Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:22:52.489732Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:22:52.490094Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:22:52.490461Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:22:52.490714Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:23:58.489629Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:23:58.489979Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:23:58.490383Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:23:58.490639Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:25:04.489411Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:25:04.489794Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:25:04.490167Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:25:04.490420Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:26:10.490152Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:26:10.490773Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:26:10.491486Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:26:10.491973Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:27:16.489373Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:27:16.490170Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+[2m2026-08-24T01:27:16.491045Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size start [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v"
+[2m2026-08-24T01:27:16.491620Z[0m [32m INFO[0m [2mrmudos::efun::mudos_extra[0m[2m:[0m file_size done [3mpath[0m[2m=[0m"/adm/save/daemons/wizchar.v" [3msize[0m[2m=[0m5 [3melapsed_ms[0m[2m=[0m0
+2026-08-24T01:27:31.058623Z  INFO rmudos::efun::mudos_extra: file_size start path="/adm/save/daemons/wizchar.v"
+2026-08-24T01:27:31.059461Z  INFO rmudos::efun::mudos_extra: file_size done path="/adm/save/daemons/wizchar.v" size=5 elapsed_ms=0
+2026-08-24T01:27:31.060393Z  INFO rmudos::efun::mudos_extra: file_size start path="/adm/save/daemons/wizchar.v"
+2026-08-24T01:27:31.061191Z  INFO rmudos::efun::mudos_extra: file_size done path="/adm/save/daemons/wizchar.v" size=5 elapsed_ms=0

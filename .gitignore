@@ -22,3 +22,5 @@ target/
 *.zip
 *.tar.gz
 *.tgz
+lpc-errors.log
+mudlib/log/auto_remove
