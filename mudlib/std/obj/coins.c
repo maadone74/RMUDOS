@@ -10,15 +10,19 @@ int query_coins() { return 1; }
 
 int move(object tmp) {
     string *currs;
-    int tmp_size, i;
+    int tmp_size, i, bucks;
 
     if(!tmp) return ::move(tmp);
     if(!living(tmp)) return ::move(tmp);
-    for(i=0, tmp_size = sizeof(currs=query_currencies()); i<tmp_size; i++) {
+    for(i=0, bucks=0, tmp_size=sizeof(currs=query_currencies()); i<tmp_size; i++)
+	bucks += query_money(currs[i]);
+    if(!bucks) return ::move(tmp);
+    for(i=0; i<tmp_size; i++) {
         tmp->add_money(currs[i], query_money(currs[i]));
         set_money(currs[i], 0);
     }
     call_out("remove", 2);
+    return 0;
 }
 
 void create() {

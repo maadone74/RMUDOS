@@ -35,6 +35,14 @@ void load_lockers() {
 
 int query_is_locker_room() { return 1; }
 
+int receive_objects() {
+  if(!::receive_objects()) return 0;
+  if(load_status < 2) return 1;
+  if(previous_object() && previous_object()->query_is_locker())
+    call_out("update_me", 1);
+  return 1;
+}
+
 void update_me() {
   SAVE_ITEMS_D->update_lockers(this_object());
   return;

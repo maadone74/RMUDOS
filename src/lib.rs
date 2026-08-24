@@ -921,6 +921,301 @@ void go(object who) {
     }
 
     #[test]
+    fn hammer_of_faith_query_type_via_call_other() {
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib: mudlib.clone(),
+            ..Default::default()
+        });
+        let hammer = world
+            .clone_object("/std/diewarzau/obj/weapons/hammer_of_faith")
+            .expect("clone hammer");
+        let typ = world
+            .apply(
+                hammer.clone(),
+                "query_type",
+                Vec::new(),
+                None,
+                None,
+            )
+            .expect("apply query_type");
+        assert_eq!(
+            typ.as_string(),
+            Some("two handed holy"),
+            "apply query_type: {typ:?}"
+        );
+        // Same as combat: other object call_others query_type on the hammer.
+        let caller_prog = compiler::compile_source(
+            r#"
+string check(object w) { return (string)w->query_type(); }
+int bonus(object w) { return (int)w->query_hit_bonus(); }
+"#,
+            "/test/hammer_caller",
+        )
+        .expect("compile caller");
+        let caller_id = world.allocate_object_id();
+        let caller = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            caller_id,
+            "/test/hammer_caller".to_owned(),
+            std::sync::Arc::new(caller_prog),
+        )));
+        world.objects.write().insert(caller_id, caller.clone());
+        let via_arrow = world
+            .apply(
+                caller.clone(),
+                "check",
+                vec![crate::vm::value::LpcValue::Object(hammer.clone())],
+                None,
+                None,
+            )
+            .expect("check");
+        assert_eq!(
+            via_arrow.as_string(),
+            Some("two handed holy"),
+            "call_other query_type: {via_arrow:?}"
+        );
+        let bonus = world
+            .apply(
+                caller,
+                "bonus",
+                vec![crate::vm::value::LpcValue::Object(hammer)],
+                None,
+                None,
+            )
+            .expect("bonus");
+        assert!(
+            bonus.as_int().unwrap_or(0) != 0,
+            "query_hit_bonus should be non-zero for quality 4, got {bonus:?}"
+        );
+    }
+
+    #[test]
+    fn distinct_array_preserves_weapon_objects() {
+        // combat: weapons = distinct_array(query_wielded());
+        // Old simul used objects as mapping keys; RMUDOS stringified them.
+        let prog = compiler::compile_source(
+            r#"
+string check(object w) {
+    mixed *d;
+    d = distinct_array(({ w, w }));
+    if (sizeof(d) != 1) return "size:"+sizeof(d);
+    if (!objectp(d[0])) return "not_object";
+    return (string)d[0]->query_type();
+}
+"#,
+            "/test/distinct_wield",
+        )
+        .expect("compile");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let simul = world
+            .load_object("/adm/obj/simul_efun")
+            .expect("load simul_efun");
+        world.set_simul_efun(simul);
+        let id = world.allocate_object_id();
+        let object = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            id,
+            "/test/distinct_wield".to_owned(),
+            std::sync::Arc::new(prog),
+        )));
+        world.objects.write().insert(id, object.clone());
+        let weapon = world
+            .clone_object("/std/diewarzau/obj/weapons/hammer_of_faith")
+            .expect("clone hammer");
+        let result = world
+            .apply(
+                object,
+                "check",
+                vec![crate::vm::value::LpcValue::Object(weapon)],
+                None,
+                None,
+            )
+            .expect("check");
+        assert_eq!(
+            result.as_string(),
+            Some("two handed holy"),
+            "distinct_array must keep weapon objects, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn call_other_routes_through_skill_shadow() {
+        let target_prog = compiler::compile_source(
+            r#"
+int query_skill(string skill) { return 10; }
+int check() { return this_object()->query_skill("two handed holy"); }
+"#,
+            "/test/skill_target",
+        )
+        .expect("compile target");
+        let shadow_prog = compiler::compile_source(
+            r#"
+int bonus;
+void attach(object who, int b) {
+    bonus = b;
+    shadow(who, 1);
+}
+int query_skill(string skill) {
+    return (int)query_shadowing(this_object())->query_skill(skill) + bonus;
+}
+"#,
+            "/test/skill_shadow",
+        )
+        .expect("compile shadow");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let target_id = world.allocate_object_id();
+        let target = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            target_id,
+            "/test/skill_target".to_owned(),
+            std::sync::Arc::new(target_prog),
+        )));
+        world.objects.write().insert(target_id, target.clone());
+        let shadow_id = world.allocate_object_id();
+        let shadower = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            shadow_id,
+            "/test/skill_shadow".to_owned(),
+            std::sync::Arc::new(shadow_prog),
+        )));
+        world.objects.write().insert(shadow_id, shadower.clone());
+        world
+            .apply(
+                shadower.clone(),
+                "attach",
+                vec![
+                    crate::vm::value::LpcValue::Object(target.clone()),
+                    crate::vm::value::LpcValue::Int(50),
+                ],
+                None,
+                None,
+            )
+            .expect("attach skill shadow");
+        let via_call_other = world
+            .apply(target.clone(), "check", Vec::new(), None, None)
+            .expect("check");
+        assert_eq!(
+            via_call_other.as_int(),
+            Some(60),
+            "call_other query_skill must hit skill_shadow (base 10 + bonus 50)"
+        );
+    }
+
+    #[test]
+    fn local_query_skill_with_origin_gate_sees_shadow() {
+        // combat.c: bare query_skill() → skills.c origin gate → this_object()->query_skill
+        let living_prog = compiler::compile_source(
+            r#"
+int skill;
+mapping skills;
+
+void create() { skills = ([ "attack": (["level": 105]) ]); }
+
+int query_skill(string which) {
+    if (origin() != "call_other") return (int)this_object()->query_skill(which);
+    if (undefinedp(skills[which])) return 0;
+    return skills[which]["level"];
+}
+
+int to_hit(string wtype) {
+    object me;
+    me = this_object();
+    skill = 0;
+    skill = query_skill(wtype);
+    skill += ((int)me->query_skill("attack") / 5 - 15);
+    return skill;
+}
+"#,
+            "/test/combat_skill_living",
+        )
+        .expect("compile living");
+        let shadow_prog = compiler::compile_source(
+            r#"
+mapping skills;
+void create() { skills = ([]); }
+void add_skill(string s, int n) { skills[s] = n; }
+void attach(object who) { shadow(who, 1); }
+int query_skill(string which) {
+    int res;
+    res = (int)query_shadowing(this_object())->query_skill(which);
+    if (skills[which] && skills[which] > res) res = skills[which];
+    return res;
+}
+"#,
+            "/test/combat_skill_shad2",
+        )
+        .expect("compile shadow");
+        let mudlib = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("mudlib");
+        let world = MudWorld::new(DriverConfig {
+            mudlib,
+            ..Default::default()
+        });
+        let living_id = world.allocate_object_id();
+        let living = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            living_id,
+            "/test/combat_skill_living".to_owned(),
+            std::sync::Arc::new(living_prog),
+        )));
+        world.objects.write().insert(living_id, living.clone());
+        world
+            .apply(living.clone(), "create", Vec::new(), None, None)
+            .expect("living create");
+        let shadow_id = world.allocate_object_id();
+        let shadower = std::sync::Arc::new(parking_lot::Mutex::new(vm::Object::new(
+            shadow_id,
+            "/test/combat_skill_shad2".to_owned(),
+            std::sync::Arc::new(shadow_prog),
+        )));
+        world.objects.write().insert(shadow_id, shadower.clone());
+        world
+            .apply(shadower.clone(), "create", Vec::new(), None, None)
+            .expect("shadow create");
+        world
+            .apply(
+                shadower.clone(),
+                "add_skill",
+                vec![
+                    crate::vm::value::LpcValue::String("two handed holy".into()),
+                    crate::vm::value::LpcValue::Int(99),
+                ],
+                None,
+                None,
+            )
+            .expect("add_skill");
+        world
+            .apply(
+                shadower.clone(),
+                "attach",
+                vec![crate::vm::value::LpcValue::Object(living.clone())],
+                None,
+                None,
+            )
+            .expect("attach");
+        // heart_beat-style apply uses origin "driver"
+        let hit = world
+            .apply_with_origin(
+                living.clone(),
+                "to_hit",
+                vec![crate::vm::value::LpcValue::String("two handed holy".into())],
+                None,
+                None,
+                "driver",
+            )
+            .expect("to_hit");
+        assert_eq!(
+            hit.as_int(),
+            Some(99 + 105 / 5 - 15),
+            "driver/local query_skill must see skill_shadow; got {:?}",
+            hit.as_int()
+        );
+    }
+
+    #[test]
     fn input_to_binds_to_interactive_not_caller() {
         let room_prog = compiler::compile_source(
             r#"

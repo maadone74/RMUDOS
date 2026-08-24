@@ -58,12 +58,21 @@ impl<'a> Interpreter<'a> {
         None
     }
 
+    /// Resolve `::name` / `inherit::name` to the **defining** program's local
+    /// body. Do not return a parent `functions` entry: those copies are already
+    /// relocated into the parent's global layout, and relocating them again
+    /// from `defining_path` (e.g. `/std/money`'s 2 globals) panics when the
+    /// merged index is 59.
+    ///
+    /// `container::create` names the inherit, then searches that inherit's
+    /// tree for `create` (the deeper file need not also be named container).
     pub fn find_inherited_function(
         program: &Arc<Program>,
         inherit: Option<&str>,
         name: &str,
-    ) -> Option<FunctionInfo> {
-        for inherited in &program.inherit_programs {
+    ) -> Option<(Arc<Program>, FunctionInfo)> {
+        // Later inherits override earlier ones (same as function merge).
+        for inherited in program.inherit_programs.iter().rev() {
             if let Some(label) = inherit {
                 let basename = inherited
                     .path
@@ -71,20 +80,23 @@ impl<'a> Interpreter<'a> {
                     .next()
                     .unwrap_or(inherited.path.as_str());
                 if basename != label && inherited.path != label {
-                    // Keep searching other inherits.
-                    if let Some(function) =
+                    if let Some(found) =
                         Self::find_inherited_function(inherited, inherit, name)
                     {
-                        return Some(function);
+                        return Some(found);
                     }
                     continue;
                 }
+                if let Some(function) = inherited.local_functions.get(name) {
+                    return Some((inherited.clone(), function.clone()));
+                }
+                return Self::find_inherited_function(inherited, None, name);
             }
-            // Prefer the function body defined on this inherit (or deeper), not a
-            // later override merged into a child — use local_functions first via
-            // find_function which already walks inherit_programs.
-            if let Some(function) = Self::find_function(inherited, name) {
-                return Some(function);
+            if let Some(function) = inherited.local_functions.get(name) {
+                return Some((inherited.clone(), function.clone()));
+            }
+            if let Some(found) = Self::find_inherited_function(inherited, None, name) {
+                return Some(found);
             }
         }
         None
@@ -126,10 +138,14 @@ impl<'a> Interpreter<'a> {
         arguments: Vec<LpcValue>,
         origin: &'static str,
     ) -> Result<LpcValue> {
+        // MudOS: call_other / -> routes through shadows when the shadow
+        // defines the function. Calls from a shadow into the object it is
+        // shadowing are not re-shadowed (avoids skill_shadow loops).
+        let object = self.resolve_shadow_target(object, name);
         let program = object.lock().program.clone();
         let Some(function) = Self::find_function(&program, name) else {
             // MudOS: calling a missing function via call_other / -> returns 0.
-            return Ok(LpcValue::Null);
+            return Ok(LpcValue::Int(0));
         };
         let old_current = std::mem::replace(&mut self.current_object, object);
         let old_previous =
@@ -140,6 +156,31 @@ impl<'a> Interpreter<'a> {
         self.previous_object = old_previous;
         self.origin = old_origin;
         result
+    }
+
+    /// MudOS shadow resolution for `call_other` / `->`.
+    fn resolve_shadow_target(&self, object: ObjectRef, name: &str) -> ObjectRef {
+        if let Some(shadowed) = self
+            .current_object
+            .lock()
+            .shadowed
+            .as_ref()
+            .and_then(std::sync::Weak::upgrade)
+        {
+            if Arc::ptr_eq(&shadowed, &object) {
+                return object;
+            }
+        }
+        let shadow = object.lock().shadow.clone();
+        if let Some(shadow) = shadow {
+            if !shadow.lock().destructed {
+                let program = shadow.lock().program.clone();
+                if Self::find_function(&program, name).is_some() {
+                    return shadow;
+                }
+            }
+        }
+        object
     }
 
     fn execute(
@@ -188,7 +229,7 @@ impl<'a> Interpreter<'a> {
             let operation = function.code[instruction].clone();
             instruction += 1;
             if matches!(operation, Op::Return) {
-                return Ok(stack.pop().unwrap_or(LpcValue::Null));
+                return Ok(stack.pop().unwrap_or(LpcValue::Int(0)));
             }
             let step: Result<()> = (|| {
                 match operation {
@@ -373,7 +414,7 @@ impl<'a> Interpreter<'a> {
                             &function.defining_path,
                         )
                         .unwrap_or_else(|| object_program.clone());
-                        let called = Self::find_inherited_function(
+                        let (from_program, called) = Self::find_inherited_function(
                             &search_root,
                             inherit.as_deref(),
                             &name,
@@ -393,11 +434,6 @@ impl<'a> Interpreter<'a> {
                         // layout. The child object stores merged globals, so
                         // `exits::initiate_exits()` must remap names (MudOS).
                         let object_globals = object_program.globals.clone();
-                        let from_program = Self::find_program_by_path(
-                            &object_program,
-                            &called.defining_path,
-                        )
-                        .unwrap_or_else(|| search_root.clone());
                         let called = relocate_function_to_globals(
                             &called,
                             &from_program.globals,
@@ -553,7 +589,7 @@ impl<'a> Interpreter<'a> {
                 }
             }
         }
-        Ok(LpcValue::Null)
+        Ok(LpcValue::Int(0))
     }
 
     pub fn call_lpc_function(

@@ -54,6 +54,7 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("copy", copy_efun);
     functions.insert("sort_array", sort_array);
     functions.insert("base_name", base_name);
+    functions.insert("memory_info", memory_info);
     functions.insert("regexp", regexp_efun);
     functions.insert("add_action", add_action);
     functions.insert("clear_actions", clear_actions);
@@ -109,6 +110,9 @@ pub fn register(functions: &mut IndexMap<&'static str, super::EfunFn>) {
     functions.insert("in_edit", in_edit);
     functions.insert("in_input", in_input);
     functions.insert("repeat_string", repeat_string);
+    functions.insert("set_bit", set_bit);
+    functions.insert("clear_bit", clear_bit);
+    functions.insert("test_bit", test_bit);
     functions.insert("tail", tail_efun);
     functions.insert("read_bytes", read_bytes);
     functions.insert("rusage", rusage_efun);
@@ -721,8 +725,7 @@ fn sscanf(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Resul
     require(&arguments, 2, "sscanf")?;
     let input = arguments[0].as_string().unwrap_or("").to_owned();
     let format = arguments[1].as_string().unwrap_or("").to_owned();
-    let captures = parse_sscanf(&input, &format);
-    Ok(LpcValue::Int(captures.len() as i64))
+    Ok(LpcValue::Int(parse_sscanf(&input, &format).matched))
 }
 
 fn sscanf_values(
@@ -732,11 +735,22 @@ fn sscanf_values(
     require(&arguments, 2, "sscanf_values")?;
     let input = arguments[0].as_string().unwrap_or("").to_owned();
     let format = arguments[1].as_string().unwrap_or("").to_owned();
-    Ok(LpcValue::Array(parse_sscanf(&input, &format)))
+    let parsed = parse_sscanf(&input, &format);
+    let mut values = vec![LpcValue::Int(parsed.matched)];
+    values.extend(parsed.assigned);
+    Ok(LpcValue::Array(values))
 }
 
-fn parse_sscanf(input: &str, format: &str) -> Vec<LpcValue> {
-    let mut captures = Vec::new();
+struct SscanfResult {
+    assigned: Vec<LpcValue>,
+    matched: i64,
+}
+
+fn parse_sscanf(input: &str, format: &str) -> SscanfResult {
+    let mut result = SscanfResult {
+        assigned: Vec::new(),
+        matched: 0,
+    };
     let mut input_pos = 0;
     let format_bytes = format.as_bytes();
     let mut fi = 0;
@@ -748,39 +762,43 @@ fn parse_sscanf(input: &str, format: &str) -> Vec<LpcValue> {
             match spec {
                 b'%' => {
                     if input.as_bytes().get(input_pos) != Some(&b'%') {
-                        return captures;
+                        return result;
                     }
                     input_pos += 1;
                 }
                 b'*' => {
-                    // `%*s` / `%*d` — parse but do not capture.
+                    // `%*s` / `%*d` — parse but do not capture. MudOS still
+                    // counts the field in sscanf()'s return value (inn rooms
+                    // check `sscanf(base_name(), "%*sinn_%*s.inn") != 2`).
                     let inner = format_bytes.get(fi).copied().unwrap_or(b's');
                     fi += 1;
                     let dummy = parse_one_spec(input, &mut input_pos, inner, format_bytes, &mut fi);
                     if dummy.is_none() {
-                        return captures;
+                        return result;
                     }
+                    result.matched += 1;
                 }
                 b'd' | b'i' | b'f' | b's' => {
                     if let Some(value) =
                         parse_one_spec(input, &mut input_pos, spec, format_bytes, &mut fi)
                     {
-                        captures.push(value);
+                        result.assigned.push(value);
+                        result.matched += 1;
                     } else {
-                        return captures;
+                        return result;
                     }
                 }
                 _ => {}
             }
         } else {
             if input.as_bytes().get(input_pos) != Some(&format_bytes[fi]) {
-                return captures;
+                return result;
             }
             input_pos += 1;
             fi += 1;
         }
     }
-    captures
+    result
 }
 
 fn parse_one_spec(
@@ -867,6 +885,90 @@ fn replace_string(
         }
     }
     Ok(LpcValue::String(text))
+}
+
+/// MudOS packs 6 bits per printable character (`c = 0x20 + nibble`).
+const BITFIELD_MAX_BITS: i64 = 1200;
+
+fn bit_char_value(ch: u8) -> u8 {
+    ch.wrapping_sub(0x20) & 0x3f
+}
+
+fn set_bit(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "set_bit")?;
+    let mut chars: Vec<u8> = match &arguments[0] {
+        LpcValue::String(s) => s.as_bytes().to_vec(),
+        LpcValue::Null | LpcValue::Int(0) => Vec::new(),
+        other => bail!("set_bit argument 1 must be a string (got {})", other.type_name()),
+    };
+    let n = arguments[1]
+        .as_int()
+        .context("set_bit argument 2 must be an int")?;
+    if n < 0 || n >= BITFIELD_MAX_BITS {
+        bail!("set_bit: bit index {n} out of range");
+    }
+    let index = (n as usize) / 6;
+    let bit = (n as usize) % 6;
+    while chars.len() <= index {
+        chars.push(b' ');
+    }
+    let value = bit_char_value(chars[index]) | (1u8 << bit);
+    chars[index] = value + 0x20;
+    Ok(LpcValue::String(
+        String::from_utf8(chars).unwrap_or_default(),
+    ))
+}
+
+fn clear_bit(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "clear_bit")?;
+    let mut chars: Vec<u8> = match &arguments[0] {
+        LpcValue::String(s) => s.as_bytes().to_vec(),
+        LpcValue::Null | LpcValue::Int(0) => Vec::new(),
+        other => bail!(
+            "clear_bit argument 1 must be a string (got {})",
+            other.type_name()
+        ),
+    };
+    let n = arguments[1]
+        .as_int()
+        .context("clear_bit argument 2 must be an int")?;
+    if n < 0 || n >= BITFIELD_MAX_BITS {
+        bail!("clear_bit: bit index {n} out of range");
+    }
+    let index = (n as usize) / 6;
+    let bit = (n as usize) % 6;
+    if index >= chars.len() {
+        return Ok(LpcValue::String(
+            String::from_utf8(chars).unwrap_or_default(),
+        ));
+    }
+    let value = bit_char_value(chars[index]) & !(1u8 << bit);
+    chars[index] = value + 0x20;
+    Ok(LpcValue::String(
+        String::from_utf8(chars).unwrap_or_default(),
+    ))
+}
+
+fn test_bit(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    require(&arguments, 2, "test_bit")?;
+    let chars: &[u8] = match &arguments[0] {
+        LpcValue::String(s) => s.as_bytes(),
+        LpcValue::Null | LpcValue::Int(0) => &[],
+        other => bail!("test_bit argument 1 must be a string (got {})", other.type_name()),
+    };
+    let n = arguments[1]
+        .as_int()
+        .context("test_bit argument 2 must be an int")?;
+    if n < 0 {
+        return Ok(LpcValue::Int(0));
+    }
+    let index = (n as usize) / 6;
+    let bit = (n as usize) % 6;
+    if index >= chars.len() {
+        return Ok(LpcValue::Int(0));
+    }
+    let set = (bit_char_value(chars[index]) & (1u8 << bit)) != 0;
+    Ok(LpcValue::Int(i64::from(set)))
 }
 
 fn strsrch(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -1157,6 +1259,21 @@ fn base_name(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Re
     Ok(LpcValue::String(path))
 }
 
+/// MudOS `memory_info()` / `memory_info(ob)`. The driver does not track
+/// allocator bytes; return a stable stand-in so virtual world rooms can
+/// evaluate `memory_info() < 5000000` without an unknown-efun abort.
+fn memory_info(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
+    if arguments.is_empty() {
+        let n = interpreter.world.objects.read().len() as i64;
+        Ok(LpcValue::Int(n.saturating_mul(8192).max(65_536)))
+    } else {
+        match &arguments[0] {
+            LpcValue::Object(_) => Ok(LpcValue::Int(4096)),
+            _ => Ok(LpcValue::Int(0)),
+        }
+    }
+}
+
 fn regexp_efun(_interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> Result<LpcValue> {
     require(&arguments, 2, "regexp")?;
     // Minimal: treat pattern as substring search list API used as regexp(lines, pattern)
@@ -1261,17 +1378,31 @@ fn command_efun(interpreter: &mut Interpreter<'_>, arguments: Vec<LpcValue>) -> 
             LpcValue::Object(object) => Some(object.clone()),
             _ => None,
         })
-        .or_else(|| {
-            let current = interpreter.current_object.clone();
-            if current.lock().interactive.is_some() {
-                Some(current)
-            } else {
-                interpreter.this_player.clone()
-            }
-        })
+        .or_else(|| command_efun_executor(interpreter))
         .unwrap_or_else(|| interpreter.current_object.clone());
     let result = interpreter.world.handle_player_command(player, line)?;
     Ok(LpcValue::Int(i64::from(result.is_truthy())))
+}
+
+/// MudOS `command(str)`: run as `current_object` when it is a living (NPC
+/// `force_me`, monster `command("say …")`), not as the interactive
+/// `this_player` left over from the player's last action.
+fn command_efun_executor(interpreter: &Interpreter<'_>) -> Option<ObjectRef> {
+    let current = interpreter.current_object.clone();
+    let use_current = {
+        let guard = current.lock();
+        !guard.destructed && (guard.commands_enabled || guard.living_name.is_some())
+            || guard.interactive.is_some()
+    };
+    if use_current {
+        return Some(current);
+    }
+    if let Some(player) = interpreter.this_player.clone() {
+        if player.lock().interactive.is_some() {
+            return Some(player);
+        }
+    }
+    None
 }
 
 fn commands_efun(interpreter: &mut Interpreter<'_>, _arguments: Vec<LpcValue>) -> Result<LpcValue> {
@@ -3161,3 +3292,31 @@ fn owner_key(
 
 #[allow(dead_code)]
 fn _use_object_ref(_: ObjectRef) {}
+
+#[cfg(test)]
+mod sscanf_tests {
+    use super::parse_sscanf;
+
+    #[test]
+    fn directed_say_pattern_matches_monster_receive_message() {
+        let msg = "Rylo says in Common: shopkeeper, help";
+        let fmt = "%s says in %*s: %s,%s";
+        let result = parse_sscanf(msg, fmt);
+        assert_eq!(
+            result.matched, 4,
+            "matched {} assigned {:?}",
+            result.matched, result.assigned
+        );
+        assert_eq!(result.assigned[0].to_string(), "Rylo");
+        assert_eq!(result.assigned[1].to_string(), "shopkeeper");
+        assert_eq!(result.assigned[2].to_string(), " help");
+    }
+
+    #[test]
+    fn star_s_at_end_of_format_consumes_one_token() {
+        let msg = "Rylo says in Common: shopkeeper, help";
+        let result = parse_sscanf(msg, "%s says in %*s");
+        assert_eq!(result.matched, 2, "assigned {:?}", result.assigned);
+        assert_eq!(result.assigned[0].to_string(), "Rylo");
+    }
+}

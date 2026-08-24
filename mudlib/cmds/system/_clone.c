@@ -66,8 +66,9 @@ int cmd_clone(string str) {
 
     }
 
-    if(ob->move(this_player()) || !ob->get())
-
+    if(!ob->get())
+      ob->move(environment(this_player()));
+    else if(ob->move(this_player()))
       ob->move(environment(this_player()));
 
     if(stringp(ob->query_short()))

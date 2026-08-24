@@ -65,7 +65,8 @@ impl LpcValue {
             Self::Float(value) => *value != 0.0,
             Self::String(value) => !value.is_empty(),
             Self::Array(value) => !value.is_empty(),
-            Self::Mapping(value) => !value.is_empty(),
+            // MudOS: empty mappings are truthy (unlike empty arrays/strings).
+            Self::Mapping(_) => true,
             Self::Object(object) => !object.lock().destructed,
             Self::Function(_) => true,
             Self::Class(_) => true,
@@ -226,5 +227,18 @@ impl fmt::Display for LpcValue {
             | Self::Function(_)
             | Self::Class(_) => formatter.write_str(&self.lpc_repr()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn empty_mapping_is_truthy_like_mudos() {
+        assert!(LpcValue::Mapping(IndexMap::new()).is_truthy());
+        assert!(!LpcValue::Array(Vec::new()).is_truthy());
+        assert!(!LpcValue::String(String::new()).is_truthy());
     }
 }

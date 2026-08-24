@@ -189,7 +189,7 @@ int kill_ob(object victim, int which) {
     to_owner = (string)tobj->query_owner();
     v_owner = (string)victim->query_owner();
     to_name = (string)tobj->query_name();
-    v_owner = (string)victim->query_name();
+    v_name = (string)victim->query_name();
 
     if(attackers)
 	i = member_array(victim, attackers);
@@ -221,11 +221,16 @@ int kill_ob(object victim, int which) {
 	    return 0;
 	}
 	/* changed from 0 to 1 to faciliate PK patch */
-    if(tobj->query_attacked()) return 1;
+    /* query_attacked() is unused historically (missing lfun → 0). Do not
+     * treat any_attack as "attacked" or the victim's reciprocal kill_ob
+     * returns early and never adds this_object to its attackers. */
     if(attackers) i = member_array(victim, attackers);
     else i = -1;
+    if(!attackers) attackers = ({});
     attackers = ({ victim }) + attackers;
     any_attack = 1;
+    /* Combat rounds run from heart_beat; ensure this object ticks. */
+    set_heart_beat(1);
     if(!which) victim->kill_ob(tobj, 1);
     return 1;
 }
@@ -411,9 +416,9 @@ if(me->query_haste())
 		current = weapons[i%sizeof(weapons)];
 	    a_weapons = distinct_array(attackers[0]->query_wielded());
 	    if(current)
-		skill = query_skill((string)current->query_type());
+		skill = (int)me->query_skill((string)current->query_type());
 	    else
-		skill = query_skill("melee");
+		skill = (int)me->query_skill("melee");
 // 0 isn't bad enough? i mean even gimps can hit... parnell 02##99
 //	    if(skill <= 0)
 //		skill -= 25;
@@ -426,20 +431,20 @@ if(me->query_haste())
 
 	    if(current && !(int)me->query_property("ambidextry")) 
 	    {
+		string hand;
 		x = 0;
-		tmp = query_wielding_limbs();
-		k = sizeof(tmp);
-		while(k--)
-			if(current == query_weapon(tmp[k]) && tmp[k] == (string)me->query_property("handedness"))
-				x = 1;
-			if(!x)
-				skill -= 30 - (query_skill("offhand training")/4);
+		hand = (string)me->query_property("handedness");
+		/* Dominant hand holds this weapon → no offhand penalty. */
+		if(hand && query_weapon(hand) == current)
+			x = 1;
+		if(!x)
+			skill -= 30 - ((int)me->query_skill("offhand training")/4);
 	    }
 
 	    skill -= (int)attackers[0]->sight_adjustment(me);
 
       if(current && num_attacks > 1 && sizeof(weapons) > 1)
-         skill -= 30-(query_skill("dual attack")/4);
+         skill -= 30-((int)me->query_skill("dual attack")/4);
 	    if(a_weapons)
 	    {
 		k = sizeof(a_weapons);
@@ -457,7 +462,10 @@ if(me->query_haste())
 			has_shield = 1;
 	    }
           if(wizardp(me) && (string)me->getenv("TRACE") == "on")
-              message("info", "To hit skill: "+skill, me);
+              message("info", "To hit skill: "+skill+
+                " type="+((current)?((string)current->query_type()):"melee")+
+                " wep="+((current)?file_name(current):"none")+
+                " hit_bonus="+((current)?((int)current->query_hit_bonus()):0), me);
 if((int)attackers[0]->query_max_internal_encumbrance() <= 0)
 	      attackers[0]->set_max_internal_encumbrance(1);
 	    if(skill - random(100) <
@@ -486,7 +494,7 @@ if((int)attackers[0]->query_max_internal_encumbrance() <= 0)
 		continue;
 	    } else
 		damage = get_damage(current);
-	    if(!damage || !keys(damage)) continue;
+	    if(!mapp(damage) || !sizeof(keys(damage))) continue;
 
 //Special combat readded by Tass.
             if(random(100) < ((skill-99)/2) && i < 3) {
@@ -899,6 +907,9 @@ mapping get_damage(object weap) {
     }
     else {
 	ret_val = weap->query_all_wc();
+	/* RMUDOS: empty/unset WC or a failed call_other can yield 0;
+	 * keys(0) aborts heart_beat and combat appears to "do nothing". */
+	if(!mapp(ret_val)) ret_val = ([]);
 	tmp = keys(ret_val);
 	for(i=0;i<sizeof(tmp);i++) {
 	    ret_val[tmp[i]] += attack/15 + query_skill((string)weap->

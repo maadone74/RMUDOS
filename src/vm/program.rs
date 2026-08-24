@@ -86,20 +86,31 @@ impl FunctionInfo {
 
 /// Rewrite `LoadGlobal`/`StoreGlobal` indices from one program layout to another.
 /// Used when merging inherits and when `inherit::fun()` runs on a child object.
-pub fn relocate_function(function: &FunctionInfo, relocation: &[usize]) -> FunctionInfo {
+pub fn relocate_function(
+    function: &FunctionInfo,
+    relocation: &[usize],
+) -> Result<FunctionInfo, String> {
     let mut function = function.clone();
     for operation in &mut function.code {
         match operation {
             Op::LoadGlobal(index) | Op::StoreGlobal(index) => {
-                *index = relocation[*index];
+                let mapped = relocation.get(*index).copied().ok_or_else(|| {
+                    format!(
+                        "global index {index} out of range ({} entries) in {}::{}",
+                        relocation.len(),
+                        function.defining_path,
+                        function.name
+                    )
+                })?;
+                *index = mapped;
             }
             Op::MakeExprFunction(inner) => {
-                *inner = Arc::new(relocate_function(inner, relocation));
+                *inner = Arc::new(relocate_function(inner, relocation)?);
             }
             _ => {}
         }
     }
-    function
+    Ok(function)
 }
 
 pub fn relocate_function_to_globals(
@@ -119,7 +130,7 @@ pub fn relocate_function_to_globals(
             }
         }
     }
-    Ok(relocate_function(function, &relocation))
+    relocate_function(function, &relocation)
 }
 
 #[derive(Clone, Debug)]

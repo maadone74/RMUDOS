@@ -77,7 +77,7 @@ void finish_work(object caster, object at, int power) {
 	  environment(caster), ({ caster }) );
   at->remove();
   seteuid(getuid());
-  ob = new("/wizards/diewarzau/obj/pet/skeleton");
+  ob = new("/std/diewarzau/obj/pet/skeleton");
   ob->set_up(power);
   ob->set_owner((string)caster->query_name());
   ob->move(environment(caster));

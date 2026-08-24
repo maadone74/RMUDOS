@@ -1,0 +1,2 @@
+Currencies (["mithril":(["rate":0.01,"inflation":0.02,"weight":0.05]),"platinum":(["rate":0.1,"inflation":0.02,"weight":0.05]),"gold":(["rate":1.0,"inflation":0.03,"weight":0.1]),"electrum":(["rate":10.0,"inflation":0.03,"weight":0.1]),"silver":(["rate":50.0,"inflation":0.04,"weight":0.1]),"copper":(["rate":1000.0,"inflation":0.05,"weight":0.15])])
+LastInflation 0

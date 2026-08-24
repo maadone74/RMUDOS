@@ -1,2 +1,2 @@
-__RebootInterval 24
-__Events (["/daemon/events_d":(["time":1787109696,"function":"change_sky","args":({}),"regular":0]),"/daemon/castle_d":(["time":1787105952,"function":"check_upkeep","regular":86400,"args":({0})]),"/adm/daemon/inactivity_d":(["time":1787147566,"function":"check_inactivity","regular":64000,"args":({0})]),"/adm/daemon/wizchar_d":(["time":1787116822,"function":"output_log","regular":32400,"args":({0})])])
+__RebootInterval 72
+__Events (["/daemon/events_d":(["time":1787535539,"function":"change_sky","args":({}),"regular":0]),"/daemon/castle_d":(["time":1787538072,"function":"check_upkeep","regular":86400,"args":({0})]),"/adm/daemon/inactivity_d":(["time":1787531814,"function":"check_inactivity","regular":64000,"args":({0})]),"/adm/daemon/wizchar_d":(["time":1787548406,"function":"output_log","regular":32400,"args":({0})])])

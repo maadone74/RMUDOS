@@ -131,6 +131,11 @@ int cmd_help(string topic) {
           return 1;
         }
     }
+  /* Bare `help blacksmith` (and spells) — Darke also accepts `help skill <name>`. */
+  if(file_exists("/std/skills/"+replace_string(topic," ","_")+".c"))
+    return skill_help(topic);
+  if(file_exists("/std/spells/"+replace_string(topic," ","_")+".c"))
+    return spell_help(topic);
   message("help", "There is no help available for that topic.", this_player());
   return 1;
 }
@@ -175,7 +180,9 @@ string alig_str(string str, int x) {
 }
 
 void help() {
-    write("Syntax: <help [topic]>\n\n"+
+    write("Syntax: <help [topic]>\n"+
+        "        <help skill [skill]>\n"+
+        "        <help spell [spell]>\n\n"+
         "Gives you help ony any subject for which help is available.\n"+
         "Help exists for all commands.  For a list of what topics are\n"+
         "available, type <help topics>.\n"
@@ -199,7 +206,9 @@ if(file->query_property("prereq"))
 if(file->query_property("no crosstrain"))
     write("%^CYAN%^Can Crosstrain: %^RESET%^no");
     write("%^CYAN%^------------------------------------------------------------------------%^RESET%^");
-    if(undefinedp(file->info()))
+    if(function_exists("info", load_object(file)))
+	file->info();
+    else
 	return notify_fail("This skill has no help!  Tell a wiz.\n");
     return 1;
 }
@@ -247,7 +256,9 @@ if(file->query_property("prereq"))
 if(file->query_property("no crosstrain"))
     write("%^GREEN%^Can Crosstrain: %^RESET%^no");
     write("%^GREEN%^------------------------------------------------------------------------%^RESET%^");
-    if(undefinedp(file->info()))
+    if(function_exists("info", load_object(file)))
+	file->info();
+    else
 	return notify_fail("No help for this spell.  Tell a wiz!\n");
     return 1;
 }

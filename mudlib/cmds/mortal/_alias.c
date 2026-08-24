@@ -116,15 +116,17 @@ int help()
   write("alias <alias>\t\tCheck the value of <alias>\n");
   write("unalias <alias>\t\tRemove <alias> from the alias list.\n");
   
-  write("\nSubstitution variable that exist are:\n");
-  write("    $# - Where # is the number of the word after the verb to
-substitute.\n");
-  write("    $* - Will be substituted with everything after the verb.\n");
-  write("\nPrefixing the alias' verb with a $ allows you to set up a verb that
-does not\n");
-  write("require a space after it. i.e. 'alias $' say $*' will allow you to do
-says as:\n");
-  write("'Hey! This is most Stufly!\n");
+  write("\nSubstitution variables:\n");
+  write("    $N - Word N after the verb ($1 = first arg, $2 = second, ...).\n");
+  write("    $* - All args after the verb.  If the alias also uses $N, $*\n");
+  write("         is only the remaining words after the highest $N used.\n");
+  write("         Example: alias shopbuy say shopkeeper, offer $1 mithril "
+	"for $*\n");
+  write("         Then: shopbuy 1000 storage locker\n");
+  write("         Becomes: say shopkeeper, offer 1000 mithril for "
+	"storage locker\n");
+  write("\nPrefix the alias verb with $ for a no-space prefix verb.\n");
+  write("Example: alias $' say $*   then type: 'Hey there!\n");
   write("\nLook at the default aliases for examples.\n");
   write("See also: unalias, nickname, unnickname, history\n");
   return 1;

@@ -1,2 +1,2 @@
-Currencies ([])
-LastInflation 1787103293
+Currencies (["mithril":(["rate":0.12184836535994704,"inflation":0.02,"weight":0.05]),"platinum":(["rate":1.2184836535994705,"inflation":0.02,"weight":0.05]),"gold":(["rate":17.786892930956384,"inflation":0.03,"weight":0.1]),"electrum":(["rate":177.86892930956387,"inflation":0.03,"weight":0.1]),"silver":(["rate":1169.7690143877503,"inflation":0.04,"weight":0.1]),"copper":(["rate":29010.30276636987,"inflation":0.05,"weight":0.15])])
+LastInflation 1787519042

@@ -93,7 +93,10 @@ pub fn generate(
             .collect();
         for (name, function) in &program.functions {
             // Later inherits override earlier ones (MudOS semantics).
-            functions.insert(name.clone(), relocate_function(function, &relocation));
+            functions.insert(
+                name.clone(),
+                relocate_function(function, &relocation).expect("inherited global was merged"),
+            );
         }
     }
 
@@ -131,12 +134,23 @@ pub fn generate(
     }
     if !initialization.is_empty() {
         if let Some(create) = local_functions.get_mut("create") {
+            let offset = initialization.len();
+            // Jump / catch targets are absolute indices into create.code.
+            // Prepending global initializers must shift those targets.
+            for op in &mut create.code {
+                match op {
+                    Op::Jump(target) | Op::JumpIfFalse(target) | Op::EnterCatch(target) => {
+                        *target = target.saturating_add(offset);
+                    }
+                    _ => {}
+                }
+            }
             let mut code = initialization;
             code.append(&mut create.code);
             create.code = code;
             functions.insert("create".to_owned(), create.clone());
         } else {
-            initialization.push(Op::Constant(LpcValue::Null));
+            initialization.push(Op::Constant(LpcValue::Int(0)));
             initialization.push(Op::Return);
             let create = FunctionInfo {
                 name: "create".to_owned(),
@@ -212,7 +226,8 @@ impl<'a> FunctionCompiler<'a> {
     fn compile(mut self) -> Result<FunctionInfo> {
         self.compile_statement(&self.declaration.body)?;
         if !matches!(self.code.last(), Some(Op::Return)) {
-            self.code.push(Op::Constant(LpcValue::Null));
+            // MudOS: falling off a function returns 0, not "undefined".
+            self.code.push(Op::Constant(LpcValue::Int(0)));
             self.code.push(Op::Return);
         }
         Ok(FunctionInfo {
@@ -345,11 +360,16 @@ impl<'a> FunctionCompiler<'a> {
                 });
                 let mut next_case_patches: Vec<usize> = Vec::new();
                 let mut after_body_patches: Vec<usize> = Vec::new();
+                // MudOS: `default` matches only after every `case` misses.
+                // `case 0: default: foo(); case 1: bar();` must still run
+                // `bar()` when the value is 1 (armour/weapon virtual_setup).
+                let mut default_body: Option<usize> = None;
                 for (index, case) in cases.iter().enumerate() {
                     for patch in next_case_patches.drain(..) {
                         self.patch_jump(patch, self.code.len());
                     }
                     let mut body_patches = Vec::new();
+                    let mut is_default = false;
                     for label in &case.labels {
                         match label {
                             Some(CaseLabel::Value(label_expr)) => {
@@ -388,9 +408,7 @@ impl<'a> FunctionCompiler<'a> {
                                 self.patch_jump(miss_hi, self.code.len());
                             }
                             None => {
-                                let hit = self.code.len();
-                                self.code.push(Op::Jump(usize::MAX));
-                                body_patches.push(hit);
+                                is_default = true;
                             }
                         }
                     }
@@ -398,6 +416,9 @@ impl<'a> FunctionCompiler<'a> {
                     self.code.push(Op::Jump(usize::MAX));
                     next_case_patches.push(miss_all);
                     let body_start = self.code.len();
+                    if is_default {
+                        default_body = Some(body_start);
+                    }
                     for patch in body_patches {
                         self.patch_jump(patch, body_start);
                     }
@@ -411,8 +432,10 @@ impl<'a> FunctionCompiler<'a> {
                         after_body_patches.push(skip);
                     }
                 }
+                let after_tests = self.code.len();
+                let missed_target = default_body.unwrap_or(after_tests);
                 for patch in next_case_patches {
-                    self.patch_jump(patch, self.code.len());
+                    self.patch_jump(patch, missed_target);
                 }
                 let cleanup = self.code.len();
                 for patch in after_body_patches {
@@ -460,7 +483,8 @@ impl<'a> FunctionCompiler<'a> {
                 if let Some(value) = value {
                     self.compile_expression(value)?;
                 } else {
-                    self.code.push(Op::Constant(LpcValue::Null));
+                    // MudOS: `return;` yields 0.
+                    self.code.push(Op::Constant(LpcValue::Int(0)));
                 }
                 self.code.push(Op::Return);
             }
@@ -934,21 +958,24 @@ impl ExpressionCompiler<'_> {
             // `substr()` / `query_title()` concatenated a trailing "0".
             self.code.push(Op::Dup);
             self.code.push(Op::CallEfun("sizeof".to_owned(), 1));
-            self.code.push(Op::Constant(LpcValue::Int(index as i64)));
+            self.code
+                .push(Op::Constant(LpcValue::Int((index + 1) as i64)));
             self.code.push(Op::Swap);
             self.code.push(Op::Less);
             let skip = self.code.len();
             self.code.push(Op::JumpIfFalse(usize::MAX));
             self.code.push(Op::Dup);
-            self.code.push(Op::Constant(LpcValue::Int(index as i64)));
+            self.code
+                .push(Op::Constant(LpcValue::Int((index + 1) as i64)));
             self.code.push(Op::Index);
             self.compile_store_lvalue(target)?;
             self.code.push(Op::Pop);
             let after = self.code.len();
             patch_expression_jump(self.code, skip, after);
         }
-        self.code
-            .push(Op::CallEfun("sizeof".to_owned(), 1));
+        // MudOS return value counts `%*` fields too (monster receive_message).
+        self.code.push(Op::Constant(LpcValue::Int(0)));
+        self.code.push(Op::Index);
         Ok(())
     }
 

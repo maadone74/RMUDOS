@@ -58,7 +58,7 @@ void finish_work(object from, object at) {
     message("info", ""+(string)from->query_cap_name() +
       " finishes embalming a corpse.", environment(from),
       ({ from }));
-    ob = new("/wizards/diewarzau/obj/misc/emb_corpse");
+    ob = new("/std/diewarzau/obj/misc/emb_corpse");
     ob->set_level((int)at->query_level());
     inv=all_inventory(at);
     for (i=0;i<sizeof(inv);i++){

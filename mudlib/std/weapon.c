@@ -609,9 +609,12 @@ mapping query_all_wc() {
     string *types;
     mapping ret_val, extra;
 
-    if(!__Weapon["wc"]) return ([]);
+    /* Local ints are not zero-filled on this driver; unbalanced wield left stf unset. */
+    stf = 0;
+    ret_val = ([]);
+    if(!__Weapon || !mapp(__Weapon["wc"])) return ret_val;
     i = sizeof((types = query_wc_types()));
-    if(i) ret_val = allocate_mapping(i);
+    if(!i) return ret_val;
     if(query_wielded()) {
     	if(query_property("balanced") &&
     		query_property("balanced") ==

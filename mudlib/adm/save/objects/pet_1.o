@@ -1,0 +1,63 @@
+encumbrance 0
+props (["ambidextry":1,"base hp regen":5,"base mp regen":5,"melee damage":(["cutting":15]),"enhance criticals":(["holy":1,"impaling":-1]),"physical resistance":(["default":20,"iron":20,"steel":20,"wood":20])])
+true_name "frank"
+creator "/std/spells/animate_skeleton#70"
+material 0
+possible_to_close 0
+is_closed 0
+max_internal_encumbrance 3120
+deaths 0
+player_data (["general":(["hp":260,"max_hp":260,"sp":1,"max_sp":1,"exp buffer":0,"experience":2056])])
+magic (["max points":188,"points":188])
+severed ([])
+healing ([])
+body (["torso":(["limb_ref":"FATAL","max_dam":130,"damage":0,"ac":4,"armour":({}),"armour_ob":({}),"weapons":0]),"head":(["limb_ref":"FATAL","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"right arm":(["limb_ref":"right hand","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"right hand":(["limb_ref":"","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0,"wieldable":1]),"left arm":(["limb_ref":"left hand","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"left hand":(["limb_ref":"","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0,"wieldable":1]),"left leg":(["limb_ref":"left foot","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"left foot":(["limb_ref":"","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"right leg":(["limb_ref":"right foot","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0]),"right foot":(["limb_ref":"","max_dam":130,"damage":0,"ac":2,"armour":({}),"armour_ob":({}),"weapons":0])])
+limbs ({"torso","head","right arm","right hand","left arm","left hand","left leg","left foot","right leg","right foot"})
+all_my_fingers 5
+heal_rate 5
+char_class 0
+skills (["melee":(["level":48,"points":0,"max":0,"stat":"strength"]),"attack":(["level":26,"points":0,"max":0,"stat":"dexterity"]),"swimming":(["level":100,"stat":"constitution"]),"perception":(["level":28,"stat":"intelligence"]),"defense":(["level":13]),"blade":(["level":42,"stat":"dexterity"]),"knife":(["level":53,"stat":"dexterity"]),"blunt":(["level":36,"stat":"dexterity"]),"two handed staff":(["level":41,"stat":"dexterity"]),"projectile":(["level":34]),"two handed blade":(["level":35,"stat":"dexterity"]),"dodge":(["level":17,"stat":"dexterity"]),"parry":(["level":28,"stat":"dexterity"])])
+spells 0
+wimpy 0
+wimpydir "out"
+protection 0
+hits 0
+pois 0
+i 0
+j 0
+k 0
+num_attacks 0
+x 0
+defendflag 0
+num_rounds 0
+parry_bonus 0
+has_shield 0
+skill 0
+y 0
+env_var 0
+money 0
+invis 0
+ok_to_heal 1142
+player_age 1140
+sight_bonus 0
+description 0
+gender "neuter"
+stats (["constitution":60,"strength":104,"intelligence":66,"wisdom":57,"dexterity":69,"charisma":55])
+languages (["common":10,"undeadish":10,"treefolk":10,"yin":10,"serra":10,"dwarvish":10,"elvish":10,"undead-tongue":10])
+primary_language "common"
+language_exp 0
+xp_to_next_dev 0
+fllw 0
+combat_chance 0
+tmp 0
+level 1
+emotes ([])
+speech ([])
+spell_chance ([])
+body_type "human"
+casting_chance 0
+combat_spells 0
+register_idx 1
+my_file 0
+block_exit 0
+Pet_data (["attack":1,"carry":0,"save":1,"aggr status":0,"owner":"rylo","real name":"skeleton","name":"Frank"])

@@ -15,7 +15,7 @@ destinations (["west":"//d/damned/guilds/tinker/tinker_shop","up":"//d/damned/gu
 invis_exits ([])
 pre_exit_func (["west":"class_check"])
 post_exit_func ([])
-tracks ({})
+tracks ({0})
 __Items (["sky":0,"sun":0,"moon":0,"moons":0,"warzau":0,"ankh":0,"luna":0,"red moon":0,"blue moon":0,"green moon":0,"staircase":"It is crafted out of iron and looks very proffesionally done.","things":"There is a sign nearby that says 'Look with your eyes not your hands.' Shucks."])
 reset_number 0
 guild_list (["rylo":(["status":"member"])])

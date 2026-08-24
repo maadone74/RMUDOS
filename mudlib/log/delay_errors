@@ -1,0 +1,2 @@
+Error in delayed call: /std/spells/call_hammer_of_faith#8
+in function do_spell: in function spell_func: compile_object did not return an object for /wizards/diewarzau/obj/weapons/hammer_of_faith: Ok(Null)

@@ -43,28 +43,41 @@ void remove_alias(string verb) {
 
 string
 replace_words(string orig, string *words) {
-  string ret, tmp;
+  string ret, tmp, rest;
   string *parts;
-  int i, num;
+  int i, num, maxn;
 
+  if(!words) words = ({});
   parts = explode (orig+"$","$");
   if (!parts)
     return orig;
   ret = orig;
+  maxn = 0;
+  /* Numbered $n first so $* can mean "remaining args" when both are used. */
   for (i = 0; i < sizeof(parts); i++) {
+      if (!parts[i] || parts[i] == "")
+	continue;
       if (parts[i][0] == '*')
-	ret = replace_string(orig,"$*",implode(words," "));
-      else {
-	  if (sscanf(parts[i],"%d%*s",num) == 0)
-	    if (sscanf(parts[i],"%d",num) == 0)
-	      continue;
-	  if (num > 0 && num <= sizeof(words))
-	    {
-	      tmp = sprintf ("$%d",num);
-	      ret = replace_string(ret,tmp,words[num-1]);
-	    }
+	continue;
+      if (sscanf(parts[i],"%d%*s",num) == 0)
+	if (sscanf(parts[i],"%d",num) == 0)
+	  continue;
+      if (num > 0 && num <= sizeof(words)) {
+	  if (num > maxn) maxn = num;
+	  tmp = sprintf ("$%d",num);
+	  ret = replace_string(ret,tmp,words[num-1]);
 	}
     }
+  if (strsrch(ret, "$*") != -1) {
+      if (maxn > 0) {
+	if (maxn < sizeof(words))
+	  rest = implode(words[maxn..(sizeof(words)-1)], " ");
+	else
+	  rest = "";
+      } else
+	rest = implode(words, " ");
+      ret = replace_string(ret, "$*", rest);
+  }
   return ret;
 }
 

@@ -76,7 +76,7 @@ fn compile_recursive(
     let ast = parser::parse(&source).with_context(|| format!("while parsing {object_path}"))?;
     let mut inherited = Vec::new();
     for inherit in &ast.inherits {
-        let resolved = resolve_inherit(object_path, inherit)?;
+        let resolved = resolve_inherit(root, object_path, inherit)?;
         inherited.push(compile_recursive(root, &resolved, cache, visiting)?);
     }
     let program = Arc::new(
@@ -121,15 +121,34 @@ fn object_file(root: &Path, object_path: &str) -> Result<PathBuf> {
     Ok(primary)
 }
 
-fn resolve_inherit(current: &str, inherit: &str) -> Result<String> {
-    let candidate = if inherit.starts_with('/') {
-        PathBuf::from(inherit.trim_start_matches('/'))
-    } else {
-        let parent = Path::new(current.trim_start_matches('/'))
-            .parent()
-            .unwrap_or_else(|| Path::new(""));
-        parent.join(inherit)
-    };
+fn resolve_inherit(root: &Path, current: &str, inherit: &str) -> Result<String> {
+    // Absolute inherits (`/std/room`) are used as-is.
+    if inherit.starts_with('/') {
+        return Ok(normalize_object_path(inherit));
+    }
+
+    // Relative to the inheriting object first (`../foo`, same-dir `monster`).
+    let parent = Path::new(current.trim_start_matches('/'))
+        .parent()
+        .unwrap_or_else(|| Path::new(""));
+    let relative = normalize_joined_path(parent.join(inherit), inherit)?;
+    if lpc_source_path(root, &relative).is_file() {
+        return Ok(relative);
+    }
+
+    // Nightmare often writes `inherit "std/room"` meaning mudlib-root
+    // `/std/room`, not `{current_dir}/std/room`. Fall back when the relative
+    // path has no source file.
+    let absolute = normalize_object_path(&format!("/{inherit}"));
+    if lpc_source_path(root, &absolute).is_file() {
+        return Ok(absolute);
+    }
+
+    // Prefer the relative form in the error so missing local inherits stay clear.
+    Ok(relative)
+}
+
+fn normalize_joined_path(candidate: PathBuf, inherit: &str) -> Result<String> {
     let mut parts = Vec::new();
     for component in candidate.components() {
         match component {

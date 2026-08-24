@@ -155,21 +155,34 @@ impl MudWorld {
             static APPLY_STACK: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
         }
 
+        // Same MudOS shadow rules as call_other: if previous_object is the
+        // shadow of `object`, do not re-enter the shadow.
         let target = {
-            let shadow = object.lock().shadow.clone();
-            if let Some(shadow) = shadow {
-                if !shadow.lock().destructed {
-                    let program = shadow.lock().program.clone();
-                    if Interpreter::find_function(&program, function).is_some() {
-                        shadow
+            let from_own_shadow = previous_object.as_ref().is_some_and(|prev| {
+                prev.lock()
+                    .shadowed
+                    .as_ref()
+                    .and_then(std::sync::Weak::upgrade)
+                    .is_some_and(|shadowed| Arc::ptr_eq(&shadowed, &object))
+            });
+            if from_own_shadow {
+                object.clone()
+            } else {
+                let shadow = object.lock().shadow.clone();
+                if let Some(shadow) = shadow {
+                    if !shadow.lock().destructed {
+                        let program = shadow.lock().program.clone();
+                        if Interpreter::find_function(&program, function).is_some() {
+                            shadow
+                        } else {
+                            object.clone()
+                        }
                     } else {
                         object.clone()
                     }
                 } else {
                     object.clone()
                 }
-            } else {
-                object.clone()
             }
         };
 

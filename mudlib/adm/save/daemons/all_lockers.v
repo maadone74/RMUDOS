@@ -1,0 +1,1 @@
+(["/d/damned/guilds/tinker/ti_treas":(["locker_1":"/std/diewarzau/obj/misc/storage_locker"]),"/wizards/rylo/workroom":(["locker_2":"/std/diewarzau/obj/misc/storage_locker","pet_1":"/std/diewarzau/obj/pet/skeleton","locker_3":"/std/diewarzau/obj/misc/safe"])])

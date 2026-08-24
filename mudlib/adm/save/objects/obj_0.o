@@ -1,0 +1,8 @@
+encumbrance 15
+props (["value":5])
+true_name "water skin"
+creator "/cmds/system/_clone"
+material 0
+strength 0
+intox 0
+drinks_left 0

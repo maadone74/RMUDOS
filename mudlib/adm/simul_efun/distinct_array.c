@@ -2,12 +2,28 @@
 //    from Nightmare IV
 //    a faster, better namedfunction based on Huthar's uniq_array()
 //    by Descartes of Borg 940117
+//
+//    RMUDOS: do not use objects as mapping keys.  The driver stores mapping
+//    keys as strings, so keys() would return path strings and combat's
+//    distinct_array(query_wielded()) would lose the weapon objects
+//    (to-hit type=0 / skill -24).  Equality scan preserves MudOS results.
 
 mixed *distinct_array(mixed *arr) {
-    mapping tmp;
-    int i, maxi;
+    mixed *ret;
+    int i, j, maxi, dup;
 
-    for(i = 0, tmp = allocate_mapping(maxi = sizeof(arr)); i<maxi; i++)
-      tmp[arr[i]] = 1;
-    return keys(tmp);
+    if (!pointerp(arr)) return ({});
+    ret = ({});
+    maxi = sizeof(arr);
+    for (i = 0; i < maxi; i++) {
+	dup = 0;
+	for (j = 0; j < sizeof(ret); j++) {
+	    if (ret[j] == arr[i]) {
+		dup = 1;
+		break;
+	    }
+	}
+	if (!dup) ret += ({ arr[i] });
+    }
+    return ret;
 }

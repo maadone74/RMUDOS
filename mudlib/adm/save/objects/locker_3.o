@@ -1,0 +1,15 @@
+encumbrance 700
+props (["storage room":1,"value":10000])
+true_name "safe"
+creator "/adm/daemon/save_items_d"
+material 0
+possible_to_close 1
+is_closed 1
+max_internal_encumbrance 50000
+open_long_desc "\"This is an open safe which may be used for storing money"
+closed_long_desc "\"This is a strong-looking safe."
+lock_data 0
+money 0
+register_idx 3
+max_items 10
+closed_weight 0

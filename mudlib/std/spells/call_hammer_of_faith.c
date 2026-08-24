@@ -52,7 +52,7 @@ void spell_func(object caster, object at, int power, string args, int flag) {
     remove();
     return;
   }
-  ob = new("/wizards/diewarzau/obj/weapons/hammer_of_faith");
+  ob = new("/std/diewarzau/obj/weapons/hammer_of_faith");
   ob->move(caster);
   limbs = (string *)caster->query_wielding_limbs();
   if(sizeof(limbs) < 2) {
